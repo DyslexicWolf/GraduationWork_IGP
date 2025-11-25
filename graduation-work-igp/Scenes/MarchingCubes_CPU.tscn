@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://ccr52sn6j4do7"]
+
+[ext_resource type="Script" uid="uid://q1aogpnu5yq3" path="res://Scripts/TerrainGeneration.gd" id="1_n7p7l"]
+
+[node name="WorldOrigin" type="Node3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+script = ExtResource("1_n7p7l")
