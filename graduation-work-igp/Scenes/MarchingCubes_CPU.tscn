@@ -1,8 +1,57 @@
-[gd_scene load_steps=2 format=3 uid="uid://ccr52sn6j4do7"]
+[gd_scene load_steps=12 format=3 uid="uid://ccr52sn6j4do7"]
 
 [ext_resource type="Script" uid="uid://q1aogpnu5yq3" path="res://Scripts/TerrainGeneration.gd" id="1_n7p7l"]
+[ext_resource type="Material" uid="uid://d68ekxuehdgc" path="res://Materials/MAT_StandardTerrain.tres" id="2_hhg1a"]
+[ext_resource type="Material" uid="uid://vwv7ehn3e5po" path="res://Materials/MAT_Ground.tres" id="3_ukdjq"]
+[ext_resource type="Script" uid="uid://bixq1r0wgdc4p" path="res://Scripts/PlayerMovement.gd" id="4_torgq"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_hhg1a"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_ukdjq"]
+sky_material = SubResource("ProceduralSkyMaterial_hhg1a")
+
+[sub_resource type="Environment" id="Environment_torgq"]
+background_mode = 2
+sky = SubResource("Sky_ukdjq")
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_torgq"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_torgq"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_xyff7"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_torgq"]
 
 [node name="WorldOrigin" type="Node3D"]
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_torgq")
+
+[node name="GeneratedTerrain" type="MeshInstance3D" parent="."]
 script = ExtResource("1_n7p7l")
+terrain_material = ExtResource("2_hhg1a")
+resolution = 40
+noise = SubResource("FastNoiseLite_torgq")
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+transform = Transform3D(374.01376, 0, 0, 0, 0.9999994, 0, 0, 0, 299.93817, 347.9402, 0, 198.18314)
+material_override = ExtResource("3_ukdjq")
+mesh = SubResource("PlaneMesh_torgq")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -4, 1, 20)
+script = ExtResource("4_torgq")
+
+[node name="Camera3D" type="Camera3D" parent="Player"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+shape = SubResource("CapsuleShape3D_xyff7")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.87812, 12.332899, 25.047459)
+mesh = SubResource("BoxMesh_torgq")
+skeleton = NodePath("../GeneratedTerrain")

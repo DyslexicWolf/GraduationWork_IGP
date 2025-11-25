@@ -27,19 +27,19 @@ static func march_cube(x:int, y:int, z:int, voxel_grid:VoxelGrid, vertices:Packe
 #<<0, <<1, ... is to move over in the byte, so it assigns on the right bit
 static func get_triangulation(x:int, y:int, z:int, voxel_grid:VoxelGrid):
 	var idx = 0b00000000
-	idx |= int(voxel_grid.read(x, y, z) < voxel_grid.ISO_LEVEL)<<0
-	idx |= int(voxel_grid.read(x, y, z+1) < voxel_grid.ISO_LEVEL)<<1
-	idx |= int(voxel_grid.read(x+1, y, z+1) < voxel_grid.ISO_LEVEL)<<2
-	idx |= int(voxel_grid.read(x+1, y, z) < voxel_grid.ISO_LEVEL)<<3
-	idx |= int(voxel_grid.read(x, y+1, z) < voxel_grid.ISO_LEVEL)<<4
-	idx |= int(voxel_grid.read(x, y+1, z+1) < voxel_grid.ISO_LEVEL)<<5
-	idx |= int(voxel_grid.read(x+1, y+1, z+1) < voxel_grid.ISO_LEVEL)<<6
-	idx |= int(voxel_grid.read(x+1, y+1, z) < voxel_grid.ISO_LEVEL)<<7
+	idx |= int(voxel_grid.read(x, y, z) < voxel_grid.iso_level)<<0
+	idx |= int(voxel_grid.read(x, y, z+1) < voxel_grid.iso_level)<<1
+	idx |= int(voxel_grid.read(x+1, y, z+1) < voxel_grid.iso_level)<<2
+	idx |= int(voxel_grid.read(x+1, y, z) < voxel_grid.iso_level)<<3
+	idx |= int(voxel_grid.read(x, y+1, z) < voxel_grid.iso_level)<<4
+	idx |= int(voxel_grid.read(x, y+1, z+1) < voxel_grid.iso_level)<<5
+	idx |= int(voxel_grid.read(x+1, y+1, z+1) < voxel_grid.iso_level)<<6
+	idx |= int(voxel_grid.read(x+1, y+1, z) < voxel_grid.iso_level)<<7
 	return GlobalConstants.TRIANGULATIONS[idx]
 
 # Interpolate between the two vertices to place our new vertex in between
 static func calculate_interpolation(a:Vector3, b:Vector3, voxel_grid:VoxelGrid):
 	var val_a = voxel_grid.read(a.x, a.y, a.z)
 	var val_b = voxel_grid.read(b.x, b.y, b.z)
-	var t = (voxel_grid.ISO_LEVEL - val_a)/(val_b-val_a)
+	var t = (voxel_grid.iso_level - val_a)/(val_b-val_a)
 	return a+t*(b-a)
