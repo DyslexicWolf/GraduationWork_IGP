@@ -2,13 +2,13 @@ extends MeshInstance3D
 class_name TerrainGeneration
 
 @export	var terrain_material: Material
-@export var resolution: int = 50
+@export var resolution: int = 16
 @export var iso_level: float = 0.0
 @export var noise: FastNoiseLite
 @export var flat_shaded: bool = false
 @export var terrain_terrace: int = 1
-@export var chunk_size: int = 8
-@export var render_distance: int = 0
+@export var chunk_size: int = 16
+@export var render_distance: int = 1
 
 var loaded_chunks: Dictionary = {}
 var player: CharacterBody3D
@@ -21,7 +21,6 @@ func _process(_delta):
 	var player_chunk_x = int(player.position.x / chunk_size)
 	var player_chunk_y = int(player.position.y / chunk_size)
 	var player_chunk_z = int(player.position.z / chunk_size)
-	#print("chunk x="+str(player_chunk_x), "chunk y="+str(player_chunk_y), "chunk z="+str(player_chunk_z))
 	
 	# Load and unload chunks based on player position
 	for x in range(player_chunk_x - render_distance, player_chunk_x + render_distance + 1):
@@ -29,13 +28,8 @@ func _process(_delta):
 			for z in range(player_chunk_z - render_distance, player_chunk_z + render_distance + 1):
 				var chunk_key = str(x) + "," + str(y) + "," + str(z)
 				if not loaded_chunks.has(chunk_key):
-					print("x: "+str(x)+" y: "+str(y)+" z: "+str(z))
+					print("Loading chunk x :"+str(x)+" y :"+str(y)+" z :"+str(z))
 					load_chunk(x, y, z)
-				else:
-					# Update chunk position if it's already loaded
-					loaded_chunks[chunk_key].position.x = x * chunk_size
-					loaded_chunks[chunk_key].position.y = y * chunk_size
-					loaded_chunks[chunk_key].position.z = z * chunk_size
 	
 	# Unload chunks that are out of render distance
 	for key in loaded_chunks.keys().duplicate():
@@ -60,23 +54,30 @@ func unload_chunk(x, y, z):
 		var chunk_instance = loaded_chunks[chunk_key]
 		chunk_instance.queue_free()
 		loaded_chunks.erase(chunk_key)
-		print('UNLOAD CHUNK')
+		print('Unloaded chunk: ' + chunk_key)
 
-func generate_chunk_mesh(x, y, z):
-	var generated_mesh = generate(Vector3(x, y, z) * chunk_size)
+func generate_chunk_mesh(chunk_x: int, chunk_y: int, chunk_z: int):
+	var generated_mesh = generate(Vector3(chunk_x, chunk_y, chunk_z))
 	return generated_mesh
 
-func generate(chunk_pos: Vector3):
+func generate(chunk_coords: Vector3):
 	var voxel_grid = VoxelGrid.new(resolution + 1, iso_level)
+	
+	var world_offset: Vector3 = chunk_coords * chunk_size
 	
 	#generate scalar values for each voxel
 	for x in range(resolution + 1):
 		for y in range(resolution + 1):
 			for z in range(resolution + 1):
-				var value = noise.get_noise_3d(x + chunk_pos.x, y + chunk_pos.y, z + chunk_pos.z)
+				var world_x = world_offset.x + x
+				var world_y = world_offset.y + y
+				var world_z = world_offset.z + z
+				
+				var value = noise.get_noise_3d(world_x, world_y, world_z)
+				voxel_grid.write(x, y, z, value)
+				
 				#code to check out 
 				##var value = noise.get_noise_3d(x + chunk_pos.x, y + chunk_pos.y, z + chunk_pos.z)+(y+y%TERRAIN_TERRACE)/float(voxel_grid.resolution)-0.5
-				voxel_grid.write(x, y, z, value)
 	
 	#march the cubes
 	var vertices = PackedVector3Array()
