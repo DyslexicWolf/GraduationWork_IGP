@@ -1,7 +1,7 @@
 [gd_scene load_steps=12 format=3 uid="uid://ccr52sn6j4do7"]
 
 [ext_resource type="Script" uid="uid://q1aogpnu5yq3" path="res://Scripts/TerrainGeneration.gd" id="1_n7p7l"]
-[ext_resource type="Material" uid="uid://d68ekxuehdgc" path="res://Materials/MAT_StandardTerrain.tres" id="2_hhg1a"]
+[ext_resource type="Material" uid="uid://dsrpobw8nocch" path="res://Materials/SMAT_Terrain.tres" id="2_torgq"]
 [ext_resource type="Material" uid="uid://vwv7ehn3e5po" path="res://Materials/MAT_Ground.tres" id="3_ukdjq"]
 [ext_resource type="Script" uid="uid://bixq1r0wgdc4p" path="res://Scripts/PlayerMovement.gd" id="4_torgq"]
 
@@ -33,14 +33,15 @@ environment = SubResource("Environment_torgq")
 
 [node name="GeneratedTerrain" type="MeshInstance3D" parent="."]
 script = ExtResource("1_n7p7l")
-terrain_material = ExtResource("2_hhg1a")
+terrain_material = ExtResource("2_torgq")
 chunk_size = 16
 noise = SubResource("FastNoiseLite_torgq")
 flat_shaded = true
-render_distance = 1
+render_distance = 2
+render_distance_height = 1
 
 [node name="Ground" type="MeshInstance3D" parent="."]
-transform = Transform3D(374.01376, 0, 0, 0, 0.9999994, 0, 0, 0, 299.93817, 347.9402, 0, 198.18314)
+transform = Transform3D(374.01376, 0, 0, 0, 0.9999994, 0, 0, 0, 299.93817, 347.94, -16, 198.183)
 material_override = ExtResource("3_ukdjq")
 mesh = SubResource("PlaneMesh_torgq")
 
