@@ -34,8 +34,10 @@ environment = SubResource("Environment_torgq")
 [node name="GeneratedTerrain" type="MeshInstance3D" parent="."]
 script = ExtResource("1_n7p7l")
 terrain_material = ExtResource("2_hhg1a")
+chunk_size = 16
 noise = SubResource("FastNoiseLite_torgq")
 flat_shaded = true
+render_distance = 1
 
 [node name="Ground" type="MeshInstance3D" parent="."]
 transform = Transform3D(374.01376, 0, 0, 0, 0.9999994, 0, 0, 0, 299.93817, 347.9402, 0, 198.18314)
