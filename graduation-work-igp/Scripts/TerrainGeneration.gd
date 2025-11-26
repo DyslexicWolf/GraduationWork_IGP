@@ -8,9 +8,8 @@ class_name TerrainGeneration
 @export var flat_shaded: bool = false
 @export var terrain_terrace: int = 1
 @export var chunk_size: int = 8
-@export var render_distance: int = 1
+@export var render_distance: int = 0
 
-var player_position: Vector3 = Vector3()
 var loaded_chunks: Dictionary = {}
 var player: CharacterBody3D
 
@@ -18,12 +17,11 @@ func _ready():
 	player = $"../Player"
 
 func _process(_delta):
-	player_position = player.position
-	
 	# Calculate player chunk position
-	var player_chunk_x = int(player_position.x / chunk_size)
-	var player_chunk_y = int(player_position.y / chunk_size)
-	var player_chunk_z = int(player_position.z / chunk_size)
+	var player_chunk_x = int(player.position.x / chunk_size)
+	var player_chunk_y = int(player.position.y / chunk_size)
+	var player_chunk_z = int(player.position.z / chunk_size)
+	#print("chunk x="+str(player_chunk_x), "chunk y="+str(player_chunk_y), "chunk z="+str(player_chunk_z))
 	
 	# Load and unload chunks based on player position
 	for x in range(player_chunk_x - render_distance, player_chunk_x + render_distance + 1):
@@ -40,7 +38,7 @@ func _process(_delta):
 					loaded_chunks[chunk_key].position.z = z * chunk_size
 	
 	# Unload chunks that are out of render distance
-	for key in loaded_chunks.keys():
+	for key in loaded_chunks.keys().duplicate():
 		var coords = key.split(",")
 		var chunk_x = int(coords[0])
 		var chunk_y = int(coords[1])
@@ -52,9 +50,7 @@ func load_chunk(x, y, z):
 	var chunk_mesh = generate_chunk_mesh(x, y, z)
 	var chunk_instance = MeshInstance3D.new()
 	chunk_instance.mesh = chunk_mesh
-	chunk_instance.position.x = x * chunk_size
-	chunk_instance.position.y = y * chunk_size
-	chunk_instance.position.z = z * chunk_size
+	chunk_instance.position = Vector3(x, y, z) * chunk_size
 	add_child(chunk_instance)
 	loaded_chunks[str(x) + "," + str(y) + "," + str(z)] = chunk_instance
 
@@ -64,32 +60,32 @@ func unload_chunk(x, y, z):
 		var chunk_instance = loaded_chunks[chunk_key]
 		chunk_instance.queue_free()
 		loaded_chunks.erase(chunk_key)
-		print('UNLOAD CHNK')
+		print('UNLOAD CHUNK')
 
 func generate_chunk_mesh(x, y, z):
 	var generated_mesh = generate(Vector3(x, y, z) * chunk_size)
 	return generated_mesh
 
 func generate(chunk_pos: Vector3):
-	var voxel_grid = VoxelGrid.new(resolution, iso_level)
+	var voxel_grid = VoxelGrid.new(resolution + 1, iso_level)
 	
-	#generate terrain
-	for x in range(voxel_grid.resolution):
-		for y in range(voxel_grid.resolution):
-			for z in range(voxel_grid.resolution):
+	#generate scalar values for each voxel
+	for x in range(resolution + 1):
+		for y in range(resolution + 1):
+			for z in range(resolution + 1):
 				var value = noise.get_noise_3d(x + chunk_pos.x, y + chunk_pos.y, z + chunk_pos.z)
 				#code to check out 
 				##var value = noise.get_noise_3d(x + chunk_pos.x, y + chunk_pos.y, z + chunk_pos.z)+(y+y%TERRAIN_TERRACE)/float(voxel_grid.resolution)-0.5
 				voxel_grid.write(x, y, z, value)
 	
-	 #march the cubes
+	#march the cubes
 	var vertices = PackedVector3Array()
-	for x in voxel_grid.resolution-1:
-		for y in voxel_grid.resolution-1:
-			for z in voxel_grid.resolution-1:
+	for x in range(resolution):
+		for y in range(resolution):
+			for z in range(resolution):
 				HelperFunctions.march_cube(x, y, z, voxel_grid, vertices)
 	
-	# Create mesh surface and draw
+	#create mesh surface and draw
 	var surface_tool = SurfaceTool.new()
 	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	
@@ -102,4 +98,4 @@ func generate(chunk_pos: Vector3):
 	surface_tool.generate_normals()
 	surface_tool.index()
 	surface_tool.set_material(terrain_material)
-	mesh = surface_tool.commit()
+	return surface_tool.commit()
