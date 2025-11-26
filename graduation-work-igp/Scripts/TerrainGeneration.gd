@@ -60,6 +60,9 @@ func load_chunk(x, y, z):
 	var chunk_instance = MeshInstance3D.new()
 	chunk_instance.mesh = chunk_mesh
 	chunk_instance.position = Vector3(x, y, z) * chunk_size
+	
+	#create a collider from the mesh (only use this on static bodies)
+	chunk_instance.create_trimesh_collision()
 	add_child(chunk_instance)
 	loaded_chunks[chunk_key] = chunk_instance
 	
