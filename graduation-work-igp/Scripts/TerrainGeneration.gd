@@ -7,14 +7,15 @@ class_name TerrainGeneration
 @export var noise: FastNoiseLite
 @export var flat_shaded: bool = false
 @export var terrain_terrace: int = 1
-@export var chunk_size: int = 16
 @export var render_distance: int = 1
 
 var loaded_chunks: Dictionary = {}
 var player: CharacterBody3D
+var chunk_size: int
 
 func _ready():
 	player = $"../Player"
+	chunk_size = resolution
 
 func _process(_delta):
 	# Calculate player chunk position
