@@ -7,7 +7,6 @@ var pipeline: RID
 var shader: RID
 var global_buffers: Array
 var global_uniform_set: RID
-var output
 
 @export	var terrain_material: Material
 @export var chunk_size: int
@@ -111,23 +110,23 @@ func load_chunk(x, y, z):
 	var data_buffer_rid = create_data_buffer(chunk_coords)
 	var counter_buffer_rid = create_counter_buffer()
 	var triangles_buffer_rid = create_triangles_buffer()
-	
 	var per_chunk_uniform_set = create_per_chunk_uniform_set(data_buffer_rid, counter_buffer_rid, triangles_buffer_rid)
 	
-	var compute_result = run_compute_for_chunk(chunk_key, data_buffer_rid, counter_buffer_rid, triangles_buffer_rid, per_chunk_uniform_set)
+	var compute_result = run_compute_for_chunk(counter_buffer_rid, triangles_buffer_rid, per_chunk_uniform_set)
 	var total_triangles = compute_result["total_triangles"]
 	
 	#if there are no triangles, it's an empty chunk
 	if total_triangles == 0:
-		rd.free_rid(data_buffer_rid)
-		rd.free_rid(counter_buffer_rid)
-		rd.free_rid(triangles_buffer_rid)
-		rd.free_rid(per_chunk_uniform_set)
+		safe_free_rid(data_buffer_rid)
+		safe_free_rid(counter_buffer_rid)
+		safe_free_rid(triangles_buffer_rid)
+		safe_free_rid(per_chunk_uniform_set)
 		print("Didn't load chunk: " + chunk_key + " because it is empty")
 		loaded_chunks[chunk_key] = null
 		return
 	
-	var chunk_mesh = build_mesh_from_compute_data(compute_result)
+	###THIS CHUNKMESH HAS NO FACES/TRIANGLES, IT IS EMPTY
+	var chunk_mesh = build_array_mesh_from_compute_data(compute_result)
 	
 	print("Loaded chunk: "+ chunk_key)
 	var chunk_instance = MeshInstance3D.new()
@@ -135,8 +134,10 @@ func load_chunk(x, y, z):
 	chunk_instance.position = Vector3(x, y, z) * chunk_size
 	
 	#create a collider from the mesh (only use this on static bodies)
-	chunk_instance.create_trimesh_collision()
+	if chunk_mesh.get_surface_count() > 0:
+		chunk_instance.create_trimesh_collision()
 	add_child(chunk_instance)
+	
 	loaded_chunks[chunk_key] = {
 		"mesh_node": chunk_instance,
 		"data_buffer": data_buffer_rid,
@@ -145,7 +146,7 @@ func load_chunk(x, y, z):
 		"uniform_set": per_chunk_uniform_set
 		}
 
-func run_compute_for_chunk(_chunk_key: String, _data_buffer_rid: RID, counter_buffer_rid: RID, triangles_buffer_rid: RID, per_chunk_uniform_set: RID) -> Dictionary:
+func run_compute_for_chunk(counter_buffer_rid: RID, triangles_buffer_rid: RID, per_chunk_uniform_set: RID) -> Dictionary:
 	# Dispatch compute shader for this chunk
 	var compute_list := rd.compute_list_begin()
 	rd.compute_list_bind_compute_pipeline(compute_list, pipeline)
@@ -158,26 +159,29 @@ func run_compute_for_chunk(_chunk_key: String, _data_buffer_rid: RID, counter_bu
 	rd.submit()
 	rd.sync()
 	
-	# Read back results
-	var counter_data = rd.buffer_get_data(counter_buffer_rid).to_float32_array()
-	var total_triangles = int(counter_data[0])
+	#read back results
+	var total_triangles = rd.buffer_get_data(counter_buffer_rid).to_int32_array()[0]
 	
-	var output_data = rd.buffer_get_data(triangles_buffer_rid).to_float32_array()
-	
+	var triangles_data = rd.buffer_get_data(triangles_buffer_rid).to_float32_array()
 	return {
 		"total_triangles": total_triangles,
-		"output_data": output_data
+		"triangles_data": triangles_data
 	}
 
-func build_mesh_from_compute_data(compute_result: Dictionary) -> Mesh:
-	var surface_tool = SurfaceTool.new()
-	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	
-	if flat_shaded:
-		surface_tool.set_smooth_group(-1)
-	
-	var total_triangles = compute_result["total_triangles"]
+func build_array_mesh_from_compute_data(compute_result: Dictionary) -> Mesh:
+	var total_triangles = int(compute_result["total_triangles"])
 	var triangles_data = compute_result["triangles_data"]
+	
+	print("Total triangles to render: ", total_triangles)
+	print("Triangle data size: ", triangles_data.size())
+	
+	# Return empty mesh if no triangles
+	if total_triangles == 0:
+		var empty_mesh = ArrayMesh.new()
+		return empty_mesh
+	
+	var vertices = PackedVector3Array()
+	var normals = PackedVector3Array()
 	
 	# Parse triangle data: each triangle is 16 floats (3 vec4 for vertices + 1 vec4 for normal)
 	for i in range(0, total_triangles * 16, 16):
@@ -188,20 +192,25 @@ func build_mesh_from_compute_data(compute_result: Dictionary) -> Mesh:
 		
 		# Extract the normal (indices 12, 13, 14 are x, y, z; skip index 15 which is w)
 		var normal = Vector3(triangles_data[i+12], triangles_data[i+13], triangles_data[i+14])
+		vertices.append(v1)
+		vertices.append(v2)
+		vertices.append(v3)
 		
-		# Add vertices with their normal
-		surface_tool.add_vertex(v1)
-		surface_tool.set_normal(normal)
-		
-		surface_tool.add_vertex(v2)
-		surface_tool.set_normal(normal)
-		
-		surface_tool.add_vertex(v3)
-		surface_tool.set_normal(normal)
+		normals.append(normal)
+		normals.append(normal)
+		normals.append(normal)
 	
-	surface_tool.index()
-	surface_tool.set_material(terrain_material)
-	return surface_tool.commit()
+	# Create mesh using ArrayMesh
+	var mesh_data = []
+	mesh_data.resize(Mesh.ARRAY_MAX)
+	mesh_data[Mesh.ARRAY_VERTEX] = vertices
+	mesh_data[Mesh.ARRAY_NORMAL] = normals
+	
+	var array_mesh = ArrayMesh.new()
+	array_mesh.clear_surfaces()
+	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data)
+	
+	return array_mesh
 
 func create_data_buffer(chunk_coords: Vector3):
 	# Create the input params buffer
@@ -257,13 +266,13 @@ func unload_chunk(x, y, z):
 		
 		# Free GPU buffers
 		if chunk_data.has("data_buffer"):
-			rd.free_rid(chunk_data["data_buffer"])
+			safe_free_rid(chunk_data["data_buffer"])
 		if chunk_data.has("counter_buffer"):
-			rd.free_rid(chunk_data["counter_buffer"])
+			safe_free_rid(chunk_data["counter_buffer"])
 		if chunk_data.has("triangles_buffer"):
-			rd.free_rid(chunk_data["triangles_buffer"])
+			safe_free_rid(chunk_data["triangles_buffer"])
 		if chunk_data.has("uniform_set"):
-			rd.free_rid(chunk_data["uniform_set"])
+			safe_free_rid(chunk_data["uniform_set"])
 		
 		# Free the mesh node from the scene tree
 		var chunk_instance = chunk_data["mesh_node"]
@@ -277,29 +286,20 @@ func _notification(type):
 	if type == NOTIFICATION_PREDELETE:
 		release()
 
+#safely free a RID without errors if it's invalid
+func safe_free_rid(rid: RID):
+	if rid.is_valid():
+		rd.free_rid(rid)
+
 #freeing all rd related things, in the correct order
 func release():
-	#free any remaining chunk buffers or uniform sets
-	for key in loaded_chunks.keys():
-		var chunk_data = loaded_chunks[key]
-		if chunk_data != null:
-			if chunk_data.has("data_buffer"):
-				rd.free_rid(chunk_data["data_buffer"])
-			if chunk_data.has("counter_buffer"):
-				rd.free_rid(chunk_data["counter_buffer"])
-			if chunk_data.has("triangles_buffer"):
-				rd.free_rid(chunk_data["triangles_buffer"])
-			if chunk_data.has("uniform_set"):
-				rd.free_rid(chunk_data["uniform_set"])
-	loaded_chunks.clear()
-	
 	for b in global_buffers:
-		rd.free_rid(b)
+		safe_free_rid(b)
 	global_buffers.clear()
 	
-	rd.free_rid(global_uniform_set)
-	rd.free_rid(pipeline)
-	rd.free_rid(shader)
+	safe_free_rid(global_uniform_set)
+	safe_free_rid(pipeline)
+	safe_free_rid(shader)
 	
 	# Only free it if you created a rendering device yourself
 	rd.free()
