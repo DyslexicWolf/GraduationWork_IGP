@@ -16,7 +16,6 @@ var player: CharacterBody3D
 func _ready():
 	player = $"../Player"
 	
-	#noise settings for customizability
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	noise.frequency = 0.02
 	noise.cellular_jitter = 0
@@ -24,12 +23,12 @@ func _ready():
 	noise.fractal_octaves = 5
 
 func _process(_delta):
-	# Calculate player chunk position
+	#calculate player chunk position
 	var player_chunk_x = int(player.position.x / chunk_size)
 	var player_chunk_y = int(player.position.y / chunk_size)
 	var player_chunk_z = int(player.position.z / chunk_size)
 	
-	# Load and unload chunks based on player position
+	#load and unload chunks based on player position
 	for x in range(player_chunk_x - render_distance, player_chunk_x + render_distance + 1):
 		for y in range(player_chunk_y - render_distance_height, player_chunk_y + render_distance_height + 1):
 			for z in range(player_chunk_z - render_distance, player_chunk_z + render_distance + 1):
@@ -37,7 +36,7 @@ func _process(_delta):
 				if not loaded_chunks.has(chunk_key):
 					load_chunk(x, y, z)
 	
-	# Unload chunks that are out of render distance
+	#unload chunks that are out of render distance
 	for key in loaded_chunks.keys().duplicate():
 		var coords = key.split(",")
 		var chunk_x = int(coords[0])
@@ -83,12 +82,8 @@ func generate_chunk_mesh(chunk_x: int, chunk_y: int, chunk_z: int):
 	var generated_mesh = generate(Vector3(chunk_x, chunk_y, chunk_z))
 	return generated_mesh
 
-func generate(chunk_coords: Vector3):
-	var voxel_grid = VoxelGrid.new(chunk_size + 1, iso_level)
-	
-	var world_offset: Vector3 = chunk_coords * chunk_size
-	
-	#generate scalar values for each voxel
+#generate scalar values for each voxel
+func get_scalar_values(world_offset: Vector3, voxel_grid: VoxelGrid):
 	for x in range(chunk_size + 1):
 		for y in range(chunk_size + 1):
 			for z in range(chunk_size + 1):
@@ -99,6 +94,11 @@ func generate(chunk_coords: Vector3):
 				#var value = noise.get_noise_3d(world_x, world_y, world_z)+(y+y%terrain_terrace)/float(voxel_grid.resolution)-0.5
 				var value = noise.get_noise_3d(world_x, world_y, world_z)
 				voxel_grid.write(x, y, z, value)
+
+func generate(chunk_coords: Vector3):
+	var voxel_grid = VoxelGrid.new(chunk_size + 1, iso_level)
+	var world_offset: Vector3 = chunk_coords * chunk_size
+	get_scalar_values(world_offset, voxel_grid)
 	
 	#march the cubes
 	var vertices = PackedVector3Array()

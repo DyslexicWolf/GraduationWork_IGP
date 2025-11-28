@@ -35,7 +35,7 @@ static func get_triangulation(x:int, y:int, z:int, voxel_grid:VoxelGrid):
 	idx |= int(voxel_grid.read(x, y+1, z+1) < voxel_grid.iso_level)<<5
 	idx |= int(voxel_grid.read(x+1, y+1, z+1) < voxel_grid.iso_level)<<6
 	idx |= int(voxel_grid.read(x+1, y+1, z) < voxel_grid.iso_level)<<7
-	return GlobalConstants.TRIANGULATIONS[idx]
+	return GlobalConstants.LOOKUPTABLE[idx]
 
 # Interpolate between the two vertices to place our new vertex in between
 static func calculate_interpolation(a:Vector3, b:Vector3, voxel_grid:VoxelGrid):
@@ -43,3 +43,20 @@ static func calculate_interpolation(a:Vector3, b:Vector3, voxel_grid:VoxelGrid):
 	var val_b = voxel_grid.read(b.x, b.y, b.z)
 	var t = (voxel_grid.iso_level - val_a)/(val_b-val_a)
 	return a+t*(b-a)
+
+static func parse_time(time: int) -> String:
+	var MILLISECOND: int = 1000
+	var SECOND: int = 1000 * MILLISECOND
+	var MINUTE: int = 60 * SECOND
+	var HOUR: int = 60 * MINUTE
+	
+	if time < MILLISECOND:
+		return "%s μs" % time
+	elif time < SECOND:
+		return "%s ms" % (time / MILLISECOND)
+	elif time < MINUTE:
+		return "%s s" % (time / SECOND)
+	elif time < HOUR:
+		return "%s min" % (time / MINUTE)
+	else:
+		return "%s h" % (time / HOUR)

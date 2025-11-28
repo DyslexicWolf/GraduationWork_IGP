@@ -1,3 +1,44 @@
-[gd_scene format=3 uid="uid://ctf8w3p7rcpm"]
+[gd_scene load_steps=9 format=3 uid="uid://ctf8w3p7rcpm"]
+
+[ext_resource type="Script" uid="uid://b3cul5372q6v8" path="res://Scripts/GPU_Based/TerrainGeneration_GPU.gd" id="1_df2f7"]
+[ext_resource type="Material" uid="uid://vwv7ehn3e5po" path="res://Materials/MAT_Ground.tres" id="3_e38ua"]
+[ext_resource type="Script" uid="uid://bixq1r0wgdc4p" path="res://Scripts/PlayerMovement.gd" id="4_30205"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_yixtj"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_8ugv2"]
+sky_material = SubResource("ProceduralSkyMaterial_yixtj")
+
+[sub_resource type="Environment" id="Environment_afunh"]
+background_mode = 2
+sky = SubResource("Sky_8ugv2")
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_7mg7n"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_88t3t"]
 
 [node name="WorldOrigin" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_afunh")
+
+[node name="GeneratedTerrain_GPU" type="MeshInstance3D" parent="."]
+script = ExtResource("1_df2f7")
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+transform = Transform3D(374.01376, 0, 0, 0, 0.9999994, 0, 0, 0, 299.93817, 347.94, -16, 198.183)
+material_override = ExtResource("3_e38ua")
+mesh = SubResource("PlaneMesh_7mg7n")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -4, 1, 20)
+script = ExtResource("4_30205")
+
+[node name="Camera3D" type="Camera3D" parent="Player"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+shape = SubResource("CapsuleShape3D_88t3t")

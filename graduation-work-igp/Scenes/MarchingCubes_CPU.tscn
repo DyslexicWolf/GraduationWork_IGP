@@ -1,6 +1,6 @@
-[gd_scene load_steps=12 format=3 uid="uid://ccr52sn6j4do7"]
+[gd_scene load_steps=11 format=3 uid="uid://ccr52sn6j4do7"]
 
-[ext_resource type="Script" uid="uid://q1aogpnu5yq3" path="res://Scripts/TerrainGeneration.gd" id="1_n7p7l"]
+[ext_resource type="Script" uid="uid://q1aogpnu5yq3" path="res://Scripts/CPU_Based/TerrainGeneration.gd" id="1_n7p7l"]
 [ext_resource type="Material" uid="uid://dsrpobw8nocch" path="res://Materials/SMAT_Terrain.tres" id="2_torgq"]
 [ext_resource type="Material" uid="uid://vwv7ehn3e5po" path="res://Materials/MAT_Ground.tres" id="3_ukdjq"]
 [ext_resource type="Script" uid="uid://bixq1r0wgdc4p" path="res://Scripts/PlayerMovement.gd" id="4_torgq"]
@@ -24,8 +24,6 @@ glow_enabled = true
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_xyff7"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_torgq"]
-
 [node name="WorldOrigin" type="Node3D"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
@@ -34,7 +32,7 @@ environment = SubResource("Environment_torgq")
 [node name="GeneratedTerrain" type="MeshInstance3D" parent="."]
 script = ExtResource("1_n7p7l")
 terrain_material = ExtResource("2_torgq")
-chunk_size = 16
+chunk_size = 32
 noise = SubResource("FastNoiseLite_torgq")
 flat_shaded = true
 render_distance = 2
@@ -53,8 +51,3 @@ script = ExtResource("4_torgq")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
 shape = SubResource("CapsuleShape3D_xyff7")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.87812, 12.332899, 25.047459)
-mesh = SubResource("BoxMesh_torgq")
-skeleton = NodePath("../GeneratedTerrain")
