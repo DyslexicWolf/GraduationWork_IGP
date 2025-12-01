@@ -32,7 +32,7 @@ environment = SubResource("Environment_torgq")
 [node name="GeneratedTerrain" type="MeshInstance3D" parent="."]
 script = ExtResource("1_n7p7l")
 terrain_material = ExtResource("2_torgq")
-chunk_size = 32
+chunk_size = 16
 noise = SubResource("FastNoiseLite_torgq")
 flat_shaded = true
 
@@ -42,7 +42,7 @@ material_override = ExtResource("3_ukdjq")
 mesh = SubResource("PlaneMesh_torgq")
 
 [node name="Player" type="CharacterBody3D" parent="."]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -4, 1, 20)
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 29.221186, 1, 32.41128)
 script = ExtResource("4_torgq")
 
 [node name="Camera3D" type="Camera3D" parent="Player"]

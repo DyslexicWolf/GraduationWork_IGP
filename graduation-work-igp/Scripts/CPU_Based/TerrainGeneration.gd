@@ -45,7 +45,7 @@ func _process(_delta):
 		if abs(chunk_x - player_chunk_x) > render_distance or abs(chunk_y - player_chunk_y) > render_distance_height or abs(chunk_z - player_chunk_z) > render_distance:
 			unload_chunk(chunk_x, chunk_y, chunk_z)
 
-func load_chunk(x, y, z):
+func load_chunk(x: int, y: int, z: int):
 	var chunk_mesh = generate_chunk_mesh(x, y, z)
 	var chunk_key = str(x) + "," + str(y) + "," + str(z)
 	
@@ -66,7 +66,7 @@ func load_chunk(x, y, z):
 	loaded_chunks[chunk_key] = chunk_instance
 	
 
-func unload_chunk(x, y, z):
+func unload_chunk(x: int, y: int, z: int):
 	var chunk_key = str(x) + "," + str(y) + "," + str(z)
 	if loaded_chunks.has(chunk_key):
 		if loaded_chunks[chunk_key] == null:
@@ -90,14 +90,14 @@ func get_scalar_values(world_offset: Vector3, voxel_grid: VoxelGrid):
 				var world_x := world_offset.x + x
 				var world_y := world_offset.y + y
 				var world_z := world_offset.z + z
-				
-				#var value = noise.get_noise_3d(world_x, world_y, world_z)+(y+y%terrain_terrace)/float(voxel_grid.resolution)-0.5
+				#var value := noise.get_noise_3d(world_x, world_y, world_z)+(y+y%terrain_terrace)/float(voxel_grid.resolution)-0.5
 				var value := noise.get_noise_3d(world_x, world_y, world_z)
 				voxel_grid.write(x, y, z, value)
 
 func generate(chunk_coords: Vector3) -> ArrayMesh:
 	var voxel_grid := VoxelGrid.new(chunk_size + 1, iso_level)
 	var world_offset: Vector3 = chunk_coords * chunk_size
+	print("worldoffset =" + str(world_offset))
 	get_scalar_values(world_offset, voxel_grid)
 	
 	#march the cubes
@@ -106,7 +106,6 @@ func generate(chunk_coords: Vector3) -> ArrayMesh:
 		for y in range(chunk_size):
 			for z in range(chunk_size):
 				HelperFunctions.march_cube(x, y, z, voxel_grid, vertices)
-	print(vertices.size() / 3)
 	
 	#create mesh surface and draw
 	var surface_tool := SurfaceTool.new()

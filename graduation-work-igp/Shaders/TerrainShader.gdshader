@@ -1,4 +1,5 @@
 shader_type spatial;
+render_mode cull_disabled;
 
 uniform float min_height = 0.0;
 uniform float max_height = 48.0;

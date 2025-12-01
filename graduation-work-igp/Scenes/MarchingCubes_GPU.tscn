@@ -33,7 +33,7 @@ environment = SubResource("Environment_afunh")
 script = ExtResource("1_df2f7")
 terrain_material = ExtResource("2_0qbic")
 chunk_size = 16
-chunks_to_load_per_frame = 2
+chunks_to_load_per_frame = 1
 noise = SubResource("FastNoiseLite_23c27")
 flat_shaded = true
 
@@ -43,7 +43,7 @@ material_override = ExtResource("3_e38ua")
 mesh = SubResource("PlaneMesh_7mg7n")
 
 [node name="Player" type="CharacterBody3D" parent="."]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -4, 1, 20)
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 29.221186, 1, 32.41128)
 script = ExtResource("4_30205")
 
 [node name="Camera3D" type="Camera3D" parent="Player"]
