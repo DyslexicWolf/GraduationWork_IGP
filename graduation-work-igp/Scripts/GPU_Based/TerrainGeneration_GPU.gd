@@ -68,9 +68,9 @@ func setup_global_bindings():
 
 func _process(_delta):
 	#calculate player chunk position
-	var player_chunk_x = int(player.position.x / chunk_size)
-	var player_chunk_y = int(player.position.y / chunk_size)
-	var player_chunk_z = int(player.position.z / chunk_size)
+	var player_chunk_x := int(player.position.x / chunk_size)
+	var player_chunk_y := int(player.position.y / chunk_size)
+	var player_chunk_z := int(player.position.z / chunk_size)
 	
 	chunk_load_queue.clear()
 	
@@ -78,11 +78,11 @@ func _process(_delta):
 	for x in range(player_chunk_x - render_distance, player_chunk_x + render_distance + 1):
 		for y in range(player_chunk_y - render_distance_height, player_chunk_y + render_distance_height + 1):
 			for z in range(player_chunk_z - render_distance, player_chunk_z + render_distance + 1):
-				var chunk_key = str(x) + "," + str(y) + "," + str(z)
+				var chunk_key := str(x) + "," + str(y) + "," + str(z)
 				if not loaded_chunks.has(chunk_key):
-					var chunk_pos = Vector3(x, y, z)
-					var player_chunk_pos = Vector3(player_chunk_x, player_chunk_y, player_chunk_z)
-					var distance = chunk_pos.distance_to(player_chunk_pos)
+					var chunk_pos := Vector3(x, y, z)
+					var player_chunk_pos := Vector3(player_chunk_x, player_chunk_y, player_chunk_z)
+					var distance := chunk_pos.distance_to(player_chunk_pos)
 					chunk_load_queue.append({"key": chunk_key, "distance": distance, "pos": chunk_pos})
 					load_chunk(x, y, z)
 	
@@ -97,22 +97,22 @@ func _process(_delta):
 	#unload chunks that are out of render distance
 	for key in loaded_chunks.keys().duplicate():
 		var coords = key.split(",")
-		var chunk_x = int(coords[0])
-		var chunk_y = int(coords[1])
-		var chunk_z = int(coords[2])
+		var chunk_x := int(coords[0])
+		var chunk_y := int(coords[1])
+		var chunk_z := int(coords[2])
 		if abs(chunk_x - player_chunk_x) > render_distance or abs(chunk_y - player_chunk_y) > render_distance_height or abs(chunk_z - player_chunk_z) > render_distance:
 			unload_chunk(chunk_x, chunk_y, chunk_z)
 
 func load_chunk(x, y, z):
-	var chunk_key = str(x) + "," + str(y) + "," + str(z)
-	var chunk_coords = Vector3(x, y, z)
+	var chunk_key := str(x) + "," + str(y) + "," + str(z)
+	var chunk_coords := Vector3(x, y, z)
 	
-	var data_buffer_rid = create_data_buffer(chunk_coords)
-	var counter_buffer_rid = create_counter_buffer()
-	var triangles_buffer_rid = create_triangles_buffer()
-	var per_chunk_uniform_set = create_per_chunk_uniform_set(data_buffer_rid, counter_buffer_rid, triangles_buffer_rid)
+	var data_buffer_rid := create_data_buffer(chunk_coords)
+	var counter_buffer_rid := create_counter_buffer()
+	var triangles_buffer_rid := create_triangles_buffer()
+	var per_chunk_uniform_set := create_per_chunk_uniform_set(data_buffer_rid, counter_buffer_rid, triangles_buffer_rid)
 	
-	var compute_result = run_compute_for_chunk(counter_buffer_rid, triangles_buffer_rid, per_chunk_uniform_set)
+	var compute_result := run_compute_for_chunk(counter_buffer_rid, triangles_buffer_rid, per_chunk_uniform_set)
 	var total_triangles = compute_result["total_triangles"]
 	
 	#if there are no triangles, it's an empty chunk
@@ -126,10 +126,10 @@ func load_chunk(x, y, z):
 		return
 	
 	###THIS CHUNKMESH HAS NO FACES/TRIANGLES, IT IS EMPTY
-	var chunk_mesh = build_array_mesh_from_compute_data(compute_result)
+	var chunk_mesh := build_array_mesh_from_compute_data(compute_result)
 	
 	print("Loaded chunk: "+ chunk_key)
-	var chunk_instance = MeshInstance3D.new()
+	var chunk_instance := MeshInstance3D.new()
 	chunk_instance.mesh = chunk_mesh
 	chunk_instance.position = Vector3(x, y, z) * chunk_size
 	
@@ -160,9 +160,9 @@ func run_compute_for_chunk(counter_buffer_rid: RID, triangles_buffer_rid: RID, p
 	rd.sync()
 	
 	#read back results
-	var total_triangles = rd.buffer_get_data(counter_buffer_rid).to_int32_array()[0]
+	var total_triangles := rd.buffer_get_data(counter_buffer_rid).to_int32_array()[0]
 	
-	var triangles_data = rd.buffer_get_data(triangles_buffer_rid).to_float32_array()
+	var triangles_data := rd.buffer_get_data(triangles_buffer_rid).to_float32_array()
 	return {
 		"total_triangles": total_triangles,
 		"triangles_data": triangles_data
@@ -177,21 +177,21 @@ func build_array_mesh_from_compute_data(compute_result: Dictionary) -> Mesh:
 	
 	# Return empty mesh if no triangles
 	if total_triangles == 0:
-		var empty_mesh = ArrayMesh.new()
+		var empty_mesh := ArrayMesh.new()
 		return empty_mesh
 	
-	var vertices = PackedVector3Array()
-	var normals = PackedVector3Array()
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
 	
 	# Parse triangle data: each triangle is 16 floats (3 vec4 for vertices + 1 vec4 for normal)
 	for i in range(0, total_triangles * 16, 16):
 		# Extract the 3 vertices (each vertex is a vec4, so we read x, y, z and skip w)
-		var v1 = Vector3(triangles_data[i+0], triangles_data[i+1], triangles_data[i+2])
-		var v2 = Vector3(triangles_data[i+4], triangles_data[i+5], triangles_data[i+6])
-		var v3 = Vector3(triangles_data[i+8], triangles_data[i+9], triangles_data[i+10])
+		var v1 := Vector3(triangles_data[i+0], triangles_data[i+1], triangles_data[i+2])
+		var v2 := Vector3(triangles_data[i+4], triangles_data[i+5], triangles_data[i+6])
+		var v3 := Vector3(triangles_data[i+8], triangles_data[i+9], triangles_data[i+10])
 		
 		# Extract the normal (indices 12, 13, 14 are x, y, z; skip index 15 which is w)
-		var normal = Vector3(triangles_data[i+12], triangles_data[i+13], triangles_data[i+14])
+		var normal := Vector3(triangles_data[i+12], triangles_data[i+13], triangles_data[i+14])
 		vertices.append(v1)
 		vertices.append(v2)
 		vertices.append(v3)
@@ -201,39 +201,39 @@ func build_array_mesh_from_compute_data(compute_result: Dictionary) -> Mesh:
 		normals.append(normal)
 	
 	# Create mesh using ArrayMesh
-	var mesh_data = []
+	var mesh_data := []
 	mesh_data.resize(Mesh.ARRAY_MAX)
 	mesh_data[Mesh.ARRAY_VERTEX] = vertices
 	mesh_data[Mesh.ARRAY_NORMAL] = normals
 	
-	var array_mesh = ArrayMesh.new()
+	var array_mesh := ArrayMesh.new()
 	array_mesh.clear_surfaces()
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data)
 	
 	return array_mesh
 
-func create_data_buffer(chunk_coords: Vector3):
+func create_data_buffer(chunk_coords: Vector3) -> RID:
 	# Create the input params buffer
 	var data = get_per_chunk_params(chunk_coords)
 	var data_bytes = data.to_byte_array()
-	var buffer_rid = rd.storage_buffer_create(data_bytes.size(), data_bytes)
+	var buffer_rid := rd.storage_buffer_create(data_bytes.size(), data_bytes)
 	
 	return buffer_rid
 
-func create_counter_buffer():
+func create_counter_buffer() -> RID:
 	# Create counter buffer
-	var counter_bytes = PackedFloat32Array([0]).to_byte_array()
-	var buffer_rid = rd.storage_buffer_create(counter_bytes.size(), counter_bytes)
+	var counter_bytes := PackedFloat32Array([0]).to_byte_array()
+	var buffer_rid := rd.storage_buffer_create(counter_bytes.size(), counter_bytes)
 	
 	return buffer_rid
 
-func create_triangles_buffer():
+func create_triangles_buffer() -> RID:
 	#create the triangles buffer
-	var total_cells = chunk_size * chunk_size * chunk_size
-	var triangles = PackedColorArray()
+	var total_cells := chunk_size * chunk_size * chunk_size
+	var triangles := PackedColorArray()
 	triangles.resize(total_cells * 5 * (3 + 1)) # 5 triangles max per cell, 3 vertices and 1 normal per triangle
-	var triangles_bytes = triangles.to_byte_array()
-	var buffer_rid = rd.storage_buffer_create(triangles_bytes.size(), triangles_bytes)
+	var triangles_bytes := triangles.to_byte_array()
+	var buffer_rid := rd.storage_buffer_create(triangles_bytes.size(), triangles_bytes)
 	
 	return buffer_rid
 
@@ -256,7 +256,7 @@ func create_per_chunk_uniform_set(data_buffer_rid: RID, counter_buffer_rid: RID,
 	return rd.uniform_set_create([data_uniform, counter_uniform, triangles_uniform], shader, 1)
 
 func unload_chunk(x, y, z):
-	var chunk_key = str(x) + "," + str(y) + "," + str(z)
+	var chunk_key := str(x) + "," + str(y) + "," + str(z)
 	if loaded_chunks.has(chunk_key):
 		if loaded_chunks[chunk_key] == null:
 			loaded_chunks.erase(chunk_key)
@@ -306,7 +306,7 @@ func release():
 
 #this function returns the paramaters (aka noise values) for the mesh in the specified chunk
 func get_global_params():
-	var params = PackedFloat32Array()
+	var params := PackedFloat32Array()
 	params.append_array([chunk_size, chunk_size, chunk_size])
 	params.append(iso_level)
 	params.append(int(flat_shaded))
@@ -320,15 +320,15 @@ func get_per_chunk_params(chunk_coords: Vector3):
 	for x in range(chunk_size + 1):
 		for y in range(chunk_size + 1):
 			for z in range(chunk_size + 1):
-				var world_x = world_offset.x + x
-				var world_y = world_offset.y + y
-				var world_z = world_offset.z + z
+				var world_x := world_offset.x + x
+				var world_y := world_offset.y + y
+				var world_z := world_offset.z + z
 				
-				#var value = noise.get_noise_3d(world_x, world_y, world_z)+(y+y%terrain_terrace)/float(voxel_grid.resolution)-0.5
-				var value = noise.get_noise_3d(world_x, world_y, world_z)
+				#var value := noise.get_noise_3d(world_x, world_y, world_z)+(y+y%terrain_terrace)/float(voxel_grid.resolution)-0.5
+				var value := noise.get_noise_3d(world_x, world_y, world_z)
 				voxel_grid.write(x, y, z, value)
 	
-	var params = PackedFloat32Array()
+	var params := PackedFloat32Array()
 	params.append_array(voxel_grid.data)
 	return params
 
@@ -337,10 +337,10 @@ func get_scalar_values(world_offset: Vector3, voxel_grid: VoxelGrid):
 	for x in range(chunk_size + 1):
 		for y in range(chunk_size + 1):
 			for z in range(chunk_size + 1):
-				var world_x = world_offset.x + x
-				var world_y = world_offset.y + y
-				var world_z = world_offset.z + z
+				var world_x := world_offset.x + x
+				var world_y := world_offset.y + y
+				var world_z := world_offset.z + z
 				
-				#var value = noise.get_noise_3d(world_x, world_y, world_z)+(y+y%terrain_terrace)/float(voxel_grid.resolution)-0.5
-				var value = noise.get_noise_3d(world_x, world_y, world_z)
+				#var value := noise.get_noise_3d(world_x, world_y, world_z)+(y+y%terrain_terrace)/float(voxel_grid.resolution)-0.5
+				var value := noise.get_noise_3d(world_x, world_y, world_z)
 				voxel_grid.write(x, y, z, value)
