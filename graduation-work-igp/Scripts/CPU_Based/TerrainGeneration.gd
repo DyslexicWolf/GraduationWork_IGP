@@ -106,6 +106,7 @@ func generate(chunk_coords: Vector3) -> ArrayMesh:
 		for y in range(chunk_size):
 			for z in range(chunk_size):
 				HelperFunctions.march_cube(x, y, z, voxel_grid, vertices)
+	print(vertices.size() / 3)
 	
 	#create mesh surface and draw
 	var surface_tool := SurfaceTool.new()

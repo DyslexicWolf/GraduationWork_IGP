@@ -6,6 +6,10 @@ struct Triangle{
     vec4 normal; // 1 normal vec4 = 16 bytes
 };
 
+//the layout(local_size_x, local_size_y, local_size_z) in; directive specifies the number of work items (threads) in each workgroup along the x, y, and z dimensions.
+//In this case, each workgroup contains 8x8x8 = 512 threads
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
 //This is a SSBO (Shader Storage Buffer Object), this allows shaders to read and write data efficiently
 //The 'layout' configures the buffer's location and memory layout
 //'set' and 'binding' specify where the buffer is bound, essentially a memory address that the GPU can find
@@ -36,7 +40,6 @@ layout(set = 1, binding = 1, std430) coherent buffer CounterBuffer {
 layout(set = 1, binding = 2, std430) restrict buffer OutputBuffer {
     Triangle data[];
 } output_buffer;
-
 
 
 const vec3 points[8] =
@@ -84,9 +87,7 @@ vec3 calculate_interpolation(vec3 v1, vec3 v2)
 	}
 }
 
-//the layout(local_size_x, local_size_y, local_size_z) in; directive specifies the number of work items (threads) in each workgroup along the x, y, and z dimensions.
-//In this case, each workgroup contains 8x8x8 = 512 threads
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
 void main() {
 	vec3 grid_position = gl_GlobalInvocationID;
 
