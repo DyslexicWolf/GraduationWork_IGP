@@ -84,7 +84,6 @@ func _process(_delta):
 					var player_chunk_pos := Vector3(player_chunk_x, player_chunk_y, player_chunk_z)
 					var distance := chunk_pos.distance_to(player_chunk_pos)
 					chunk_load_queue.append({"key": chunk_key, "distance": distance, "pos": chunk_pos})
-					load_chunk(x, y, z)
 	
 	#sort by distance (closest first)
 	chunk_load_queue.sort_custom(func(a, b): return a["distance"] < b["distance"])
@@ -161,7 +160,6 @@ func run_compute_for_chunk(counter_buffer_rid: RID, triangles_buffer_rid: RID, p
 	
 	#read back results
 	var total_triangles := rd.buffer_get_data(counter_buffer_rid).to_int32_array()[0]
-	
 	var triangles_data := rd.buffer_get_data(triangles_buffer_rid).to_float32_array()
 	return {
 		"total_triangles": total_triangles,
