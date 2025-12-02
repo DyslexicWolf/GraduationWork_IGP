@@ -2,9 +2,10 @@ extends MeshInstance3D
 class_name TerrainGeneration_GPU
 
 var rd = RenderingServer.create_local_rendering_device()
-const uniform_set_index: int = 0
-var pipeline: RID
-var shader: RID
+var marching_cubes_pipeline: RID
+var marching_cubes_shader: RID
+var noise_generation_pipeline: RID
+var noise_generation_shader: RID
 var global_buffers: Array
 var global_uniform_set: RID
 
@@ -36,11 +37,16 @@ func _ready():
 	setup_global_bindings()
 
 func init_compute():
-	#create shader and pipeline
-	var shader_file = load("res://Shaders/ComputeShaders/MarchingCubes.glsl")
-	var shader_spirv = shader_file.get_spirv()
-	shader = rd.shader_create_from_spirv(shader_spirv)
-	pipeline = rd.compute_pipeline_create(shader)
+	#create shader and pipeline for marching cubes and noise generation
+	var marching_cubes_shader_file = load("res://Shaders/ComputeShaders/MarchingCubes.glsl")
+	var marching_cubes_shader_spirv = marching_cubes_shader_file.get_spirv()
+	marching_cubes_shader = rd.shader_create_from_spirv(marching_cubes_shader_spirv)
+	marching_cubes_pipeline = rd.compute_pipeline_create(marching_cubes_shader)
+	
+	var noise_generation_shader_file = load("res://Shaders/ComputeShaders/NoiseGeneration.glsl")
+	var noise_generation_shader_spirv = noise_generation_shader_file.get_spirv()
+	noise_generation_shader = rd.shader_create_from_spirv(noise_generation_shader_spirv)
+	noise_generation_pipeline = rd.compute_pipeline_create(noise_generation_shader)
 
 func setup_global_bindings():
 	#create the globalparams buffer
@@ -65,7 +71,7 @@ func setup_global_bindings():
 	lut_uniform.binding = 1
 	lut_uniform.add_id(global_buffers[1])
 	
-	global_uniform_set = rd.uniform_set_create([input_params_uniform, lut_uniform], shader, 0)
+	global_uniform_set = rd.uniform_set_create([input_params_uniform, lut_uniform], marching_cubes_shader, 0)
 
 func _process(_delta):
 	#calculate player chunk position
@@ -150,7 +156,7 @@ func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, pe
 	
 	#dispatch compute shader for this chunk
 	var compute_list := rd.compute_list_begin()
-	rd.compute_list_bind_compute_pipeline(compute_list, pipeline)
+	rd.compute_list_bind_compute_pipeline(compute_list, marching_cubes_pipeline)
 	rd.compute_list_bind_uniform_set(compute_list, global_uniform_set, 0)
 	rd.compute_list_bind_uniform_set(compute_list, per_chunk_uniform_set, 1) 
 	rd.compute_list_dispatch(compute_list, chunk_size / 8, chunk_size / 8, chunk_size / 8)
@@ -207,6 +213,8 @@ func build_mesh_from_compute_data(compute_result: Dictionary) -> Mesh:
 	return array_mesh
 
 func create_data_buffer(chunk_coords: Vector3) -> RID:
+	
+	
 	var data = get_per_chunk_params(chunk_coords)
 	var data_bytes = data.to_byte_array()
 	var buffer_rid := rd.storage_buffer_create(data_bytes.size(), data_bytes)
@@ -247,7 +255,7 @@ func create_per_chunk_uniform_set(data_buffer_rid: RID, counter_buffer_rid: RID,
 	vertices_uniform.binding = 2
 	vertices_uniform.add_id(vertices_buffer_rid)
 	
-	var per_chunk_uniform_set := rd.uniform_set_create([data_uniform, counter_uniform, vertices_uniform], shader, 1)
+	var per_chunk_uniform_set := rd.uniform_set_create([data_uniform, counter_uniform, vertices_uniform], marching_cubes_shader, 1)
 	assert(per_chunk_uniform_set != null, "Per_chunk_uniform_set should never be null")
 	return per_chunk_uniform_set
 
@@ -273,28 +281,7 @@ func unload_chunk(x: int, y: int, z: int):
 		loaded_chunks.erase(chunk_key)
 		print("Unloaded chunk: " + chunk_key)
 
-#safely free a RID without errors if it's invalid
-func safe_free_rid(rid: RID):
-	if rid.is_valid():
-		rd.free_rid(rid)
 
-func _notification(type):
-	#this goes through if this object (the object where the script is attached to) would get deleted
-	if type == NOTIFICATION_PREDELETE:
-		release()
-
-#freeing all rd related things, in the correct order
-func release():
-	for buffers in global_buffers:
-		safe_free_rid(buffers)
-	global_buffers.clear()
-	
-	safe_free_rid(global_uniform_set)
-	safe_free_rid(pipeline)
-	safe_free_rid(shader)
-	
-	#only free it if you created a rendering device yourself
-	rd.free()
 
 #this function returns the paramaters (aka noise values) for the mesh in the specified chunk
 func get_global_params():
@@ -324,3 +311,82 @@ func get_per_chunk_params(chunk_coords: Vector3):
 	params.append_array(voxel_grid.data)
 	assert(params != null, "Per_chunk_params should never be null")
 	return params
+	#var resolution := chunk_size + 1
+	#var total_voxels := resolution * resolution * resolution
+	#
+	##create output buffer
+	#var output_bytes := PackedFloat32Array()
+	#output_bytes.resize(total_voxels)
+	#var output_buffer := rd.storage_buffer_create(output_bytes.size() * 4, output_bytes.to_byte_array())
+	#
+	#var uniform := RDUniform.new()
+	#uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+	#uniform.binding = 0
+	#uniform.add_id(output_buffer)
+	#
+	#var noise_generation_uniform_set = rd.uniform_set_create([uniform], noise_generation_shader, 0)
+	#
+	## Prepare push constants
+	#var world_offset := chunk_coords * chunk_size
+	#var push_constant := PackedFloat32Array([
+		#world_offset.x, world_offset.y, world_offset.z,
+		#iso_level,
+		#float(chunk_size),
+		#noise.frequency,
+		#float(noise.noise_type),
+		#float(noise.fractal_type),
+		#float(noise.fractal_octaves),
+		#noise.fractal_lacunarity,
+		#noise.fractal_gain,
+		#noise.fractal_weighted_strength,
+		#noise.fractal_ping_pong_strength,
+		#float(noise.seed),
+		#
+		###padding for now, you need to supply the compute shader with 64 bytes when using constants
+		#0.0,
+		#0.0
+	#])
+	#
+	#var compute_list := rd.compute_list_begin()
+	#rd.compute_list_bind_compute_pipeline(compute_list, noise_generation_pipeline)
+	#rd.compute_list_bind_uniform_set(compute_list, noise_generation_uniform_set, 0)
+	#rd.compute_list_set_push_constant(compute_list, push_constant.to_byte_array(), push_constant.size() * 4)
+	#rd.compute_list_dispatch(compute_list, resolution / 8, resolution / 8, resolution / 8)
+	#rd.compute_list_end()
+	#
+	##submit and wait for GPU, this could be optimized technically by not having the CPU wait
+	#rd.submit()
+	#rd.sync()
+	#
+	#var output_data := rd.buffer_get_data(output_buffer)
+	#var params := output_data.to_float32_array()
+	#
+	#safe_free_rid(noise_generation_uniform_set)
+	#safe_free_rid(output_buffer)
+	#assert(params != null, "Per_chunk_params should never be null")
+	#return params
+
+#safely free a RID without errors if it's invalid
+func safe_free_rid(rid: RID):
+	if rid.is_valid():
+		rd.free_rid(rid)
+
+func _notification(type):
+	#this goes through if this object (the object where the script is attached to) would get deleted
+	if type == NOTIFICATION_PREDELETE:
+		release()
+
+#freeing all rd related things, in the correct order
+func release():
+	for buffers in global_buffers:
+		safe_free_rid(buffers)
+	global_buffers.clear()
+	
+	safe_free_rid(global_uniform_set)
+	safe_free_rid(marching_cubes_pipeline)
+	safe_free_rid(marching_cubes_shader)
+	safe_free_rid(noise_generation_pipeline)
+	safe_free_rid(noise_generation_shader)
+	
+	#only free it if you created a rendering device yourself
+	rd.free()
