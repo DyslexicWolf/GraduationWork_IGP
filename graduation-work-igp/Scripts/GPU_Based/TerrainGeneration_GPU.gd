@@ -139,6 +139,7 @@ func load_chunk(x: int, y: int, z: int):
 		"data_buffer": data_buffer_rid,
 		"counter_buffer": counter_buffer_rid,
 		"vertices_buffer": vertices_buffer_rid,
+		"per_chunk_uniform_set": per_chunk_uniform_set
 		}
 
 func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, per_chunk_uniform_set: RID) -> Dictionary:
@@ -158,7 +159,7 @@ func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, pe
 	#submit and wait for GPU, this could be optimized technically by not having the CPU wait
 	rd.submit()
 	rd.sync()
-	
+	print(per_chunk_uniform_set)
 	#read back results
 	var total_triangles := rd.buffer_get_data(counter_buffer_rid).to_int32_array()[0]
 	var output_array := rd.buffer_get_data(vertices_buffer_rid).to_float32_array()
@@ -260,6 +261,8 @@ func unload_chunk(x: int, y: int, z: int):
 		var chunk_data = loaded_chunks[chunk_key]
 		
 		#free the GPU buffers, otherwise you will have memory leaks leading to crashes
+		##free the uniform set BEFORE the buffers!!!
+		safe_free_rid(chunk_data["per_chunk_uniform_set"])
 		safe_free_rid(chunk_data["data_buffer"])
 		safe_free_rid(chunk_data["counter_buffer"])
 		safe_free_rid(chunk_data["vertices_buffer"])
