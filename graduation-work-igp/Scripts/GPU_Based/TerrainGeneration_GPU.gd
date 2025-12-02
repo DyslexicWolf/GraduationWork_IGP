@@ -21,6 +21,7 @@ var global_uniform_set: RID
 var loaded_chunks: Dictionary = {}
 var player: CharacterBody3D
 var chunk_load_queue: Array = []
+var workgroup_size: int = 8
 
 func _ready():
 	player = $"../Player"
@@ -141,7 +142,7 @@ func load_chunk(x: int, y: int, z: int):
 		}
 
 func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, per_chunk_uniform_set: RID) -> Dictionary:
-	# Reset counter to 0
+	#reset counterbuffer to 0
 	var zero_counter := PackedInt32Array([0])
 	var counter_bytes := PackedFloat32Array([0]).to_byte_array()
 	rd.buffer_update(counter_buffer_rid, 0, counter_bytes.size(),zero_counter.to_byte_array())
@@ -154,13 +155,14 @@ func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, pe
 	rd.compute_list_dispatch(compute_list, chunk_size / 8, chunk_size / 8, chunk_size / 8)
 	rd.compute_list_end()
 	
-	# Submit and wait for GPU
+	#submit and wait for GPU, this could be optimized technically by not having the CPU wait
 	rd.submit()
 	rd.sync()
 	
 	#read back results
 	var total_triangles := rd.buffer_get_data(counter_buffer_rid).to_int32_array()[0]
 	var output_array := rd.buffer_get_data(vertices_buffer_rid).to_float32_array()
+	
 	return {
 		"total_triangles": total_triangles,
 		"output_array": output_array
@@ -169,11 +171,6 @@ func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, pe
 func build_mesh_from_compute_data(compute_result: Dictionary) -> Mesh:
 	var total_triangles := int(compute_result["total_triangles"])
 	var output_array = compute_result["output_array"]
-	
-	# Return empty mesh if no triangles
-	if total_triangles == 0:
-		var empty_mesh := ArrayMesh.new()
-		return empty_mesh
 	
 	var output = {
 		"vertices": PackedVector3Array(),
@@ -192,6 +189,8 @@ func build_mesh_from_compute_data(compute_result: Dictionary) -> Mesh:
 		for j in range(3):
 			output["normals"].push_back(normal)
 	
+	print("total amount of verts= " + str(output["vertices"].size()))
+	
 	#create mesh using ArrayMesh, this is more optimal than using the surfacetool
 	var mesh_data := []
 	mesh_data.resize(Mesh.ARRAY_MAX)
@@ -202,31 +201,33 @@ func build_mesh_from_compute_data(compute_result: Dictionary) -> Mesh:
 	array_mesh.clear_surfaces()
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data)
 	array_mesh.surface_set_material(0, terrain_material)
+	
+	assert(array_mesh != null, "Arraymesh should never be null")
 	return array_mesh
 
 func create_data_buffer(chunk_coords: Vector3) -> RID:
-	# Create the input params buffer
 	var data = get_per_chunk_params(chunk_coords)
 	var data_bytes = data.to_byte_array()
 	var buffer_rid := rd.storage_buffer_create(data_bytes.size(), data_bytes)
 	
+	assert(buffer_rid != null, "Data_buffer_rid should never be null")
 	return buffer_rid
 
 func create_counter_buffer() -> RID:
-	# Create counter buffer
 	var counter_bytes := PackedFloat32Array([0]).to_byte_array()
 	var buffer_rid := rd.storage_buffer_create(counter_bytes.size(), counter_bytes)
 	
+	assert(buffer_rid != null, "Counter_buffer_rid should never be null")
 	return buffer_rid
 
 func create_vertices_buffer() -> RID:
-	#create the triangles buffer
 	var total_cells := chunk_size * chunk_size * chunk_size
 	var vertices := PackedColorArray()
 	vertices.resize(total_cells * 5 * (3 + 1)) # 5 triangles max per cell, 3 vertices and 1 normal per triangle
 	var vertices_bytes := vertices.to_byte_array()
 	var buffer_rid := rd.storage_buffer_create(vertices_bytes.size(), vertices_bytes)
 	
+	assert(buffer_rid != null, "Vertices_buffer_rid should never be null")
 	return buffer_rid
 
 func create_per_chunk_uniform_set(data_buffer_rid: RID, counter_buffer_rid: RID, vertices_buffer_rid: RID) -> RID:
@@ -245,7 +246,9 @@ func create_per_chunk_uniform_set(data_buffer_rid: RID, counter_buffer_rid: RID,
 	vertices_uniform.binding = 2
 	vertices_uniform.add_id(vertices_buffer_rid)
 	
-	return rd.uniform_set_create([data_uniform, counter_uniform, vertices_uniform], shader, 1)
+	var per_chunk_uniform_set := rd.uniform_set_create([data_uniform, counter_uniform, vertices_uniform], shader, 1)
+	assert(per_chunk_uniform_set != null, "Per_chunk_uniform_set should never be null")
+	return per_chunk_uniform_set
 
 func unload_chunk(x: int, y: int, z: int):
 	var chunk_key := str(x) + "," + str(y) + "," + str(z)
@@ -256,39 +259,38 @@ func unload_chunk(x: int, y: int, z: int):
 		
 		var chunk_data = loaded_chunks[chunk_key]
 		
-		# Free GPU buffers
+		#free the GPU buffers, otherwise you will have memory leaks leading to crashes
 		safe_free_rid(chunk_data["data_buffer"])
 		safe_free_rid(chunk_data["counter_buffer"])
 		safe_free_rid(chunk_data["vertices_buffer"])
 		
 		# Free the mesh node from the scene tree
-		var chunk_instance = chunk_data["mesh_node"]
-		chunk_instance.queue_free()
+		chunk_data["mesh_node"].queue_free()
 		
 		loaded_chunks.erase(chunk_key)
 		print("Unloaded chunk: " + chunk_key)
-
-func _notification(type):
-	#this goes through if this object (the object where the script is attached to) would get deleted
-	if type == NOTIFICATION_PREDELETE:
-		release()
 
 #safely free a RID without errors if it's invalid
 func safe_free_rid(rid: RID):
 	if rid.is_valid():
 		rd.free_rid(rid)
 
+func _notification(type):
+	#this goes through if this object (the object where the script is attached to) would get deleted
+	if type == NOTIFICATION_PREDELETE:
+		release()
+
 #freeing all rd related things, in the correct order
 func release():
-	for b in global_buffers:
-		safe_free_rid(b)
+	for buffers in global_buffers:
+		safe_free_rid(buffers)
 	global_buffers.clear()
 	
 	safe_free_rid(global_uniform_set)
 	safe_free_rid(pipeline)
 	safe_free_rid(shader)
 	
-	# Only free it if you created a rendering device yourself
+	#only free it if you created a rendering device yourself
 	rd.free()
 
 #this function returns the paramaters (aka noise values) for the mesh in the specified chunk
@@ -298,6 +300,7 @@ func get_global_params():
 	params.append(iso_level)
 	params.append(int(flat_shaded))
 	
+	assert(params != null, "Global_params should never be null")
 	return params
 
 func get_per_chunk_params(chunk_coords: Vector3):
@@ -316,4 +319,5 @@ func get_per_chunk_params(chunk_coords: Vector3):
 	
 	var params := PackedFloat32Array()
 	params.append_array(voxel_grid.data)
+	assert(params != null, "Per_chunk_params should never be null")
 	return params

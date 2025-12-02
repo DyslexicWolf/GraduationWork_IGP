@@ -91,15 +91,15 @@ vec3 calculate_interpolation(vec3 v1, vec3 v2)
 void main() {
 	vec3 grid_position = gl_GlobalInvocationID;
 
-	if (grid_position.x >= global_params.size_x || 
-        grid_position.y >= global_params.size_y || 
-        grid_position.z >= global_params.size_z) {
+	if (grid_position.x > global_params.size_x || 
+        grid_position.y > global_params.size_y || 
+        grid_position.z > global_params.size_z) {
         return;
     }
     //same as get_triangulation function in CPU version (see helper functions)
 	int triangulation = 0;
 	for (int i = 0; i < 8; ++i) {
-		triangulation |= int(voxel_value(grid_position + points[i]) > global_params.iso_level) << i;
+		triangulation |= int(voxel_value(grid_position + points[i]) < global_params.iso_level) << i;
 	}
 
 	for (int i = 0; i < 16; i += 3) {

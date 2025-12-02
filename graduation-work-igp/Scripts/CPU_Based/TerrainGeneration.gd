@@ -97,7 +97,6 @@ func get_scalar_values(world_offset: Vector3, voxel_grid: VoxelGrid):
 func generate(chunk_coords: Vector3) -> ArrayMesh:
 	var voxel_grid := VoxelGrid.new(chunk_size + 1, iso_level)
 	var world_offset: Vector3 = chunk_coords * chunk_size
-	print("worldoffset =" + str(world_offset))
 	get_scalar_values(world_offset, voxel_grid)
 	
 	#march the cubes
@@ -106,6 +105,8 @@ func generate(chunk_coords: Vector3) -> ArrayMesh:
 		for y in range(chunk_size):
 			for z in range(chunk_size):
 				HelperFunctions.march_cube(x, y, z, voxel_grid, vertices)
+	
+	print("total amount of verts= " + str(vertices.size()))
 	
 	#create mesh surface and draw
 	var surface_tool := SurfaceTool.new()
