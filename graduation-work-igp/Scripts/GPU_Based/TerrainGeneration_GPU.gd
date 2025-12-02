@@ -106,7 +106,7 @@ func load_chunk(x: int, y: int, z: int):
 	var chunk_coords := Vector3(x, y, z)
 	var data_buffer_rid := create_data_buffer(chunk_coords)
 	var counter_buffer_rid := create_counter_buffer()
-	var vertices_buffer_rid := create_triangles_buffer()
+	var vertices_buffer_rid := create_vertices_buffer()
 	var per_chunk_uniform_set := create_per_chunk_uniform_set(data_buffer_rid, counter_buffer_rid, vertices_buffer_rid)
 	
 	var compute_result := run_compute_for_chunk(counter_buffer_rid, vertices_buffer_rid, per_chunk_uniform_set)
@@ -117,7 +117,6 @@ func load_chunk(x: int, y: int, z: int):
 		safe_free_rid(data_buffer_rid)
 		safe_free_rid(counter_buffer_rid)
 		safe_free_rid(vertices_buffer_rid)
-		safe_free_rid(per_chunk_uniform_set)
 		print("Didn't load chunk: " + chunk_key + " because it is empty")
 		loaded_chunks[chunk_key] = null
 		return
@@ -138,16 +137,20 @@ func load_chunk(x: int, y: int, z: int):
 		"mesh_node": chunk_instance,
 		"data_buffer": data_buffer_rid,
 		"counter_buffer": counter_buffer_rid,
-		"triangles_buffer": vertices_buffer_rid,
-		"uniform_set": per_chunk_uniform_set
+		"vertices_buffer": vertices_buffer_rid,
 		}
 
 func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, per_chunk_uniform_set: RID) -> Dictionary:
+	# Reset counter to 0
+	var zero_counter := PackedInt32Array([0])
+	var counter_bytes := PackedFloat32Array([0]).to_byte_array()
+	rd.buffer_update(counter_buffer_rid, 0, counter_bytes.size(),zero_counter.to_byte_array())
+	
 	#dispatch compute shader for this chunk
 	var compute_list := rd.compute_list_begin()
 	rd.compute_list_bind_compute_pipeline(compute_list, pipeline)
-	rd.compute_list_bind_uniform_set(compute_list, global_uniform_set, 0)  # Global bindings
-	rd.compute_list_bind_uniform_set(compute_list, per_chunk_uniform_set, 1)  # Per-chunk bindings
+	rd.compute_list_bind_uniform_set(compute_list, global_uniform_set, 0)
+	rd.compute_list_bind_uniform_set(compute_list, per_chunk_uniform_set, 1) 
 	rd.compute_list_dispatch(compute_list, chunk_size / 8, chunk_size / 8, chunk_size / 8)
 	rd.compute_list_end()
 	
@@ -216,13 +219,13 @@ func create_counter_buffer() -> RID:
 	
 	return buffer_rid
 
-func create_triangles_buffer() -> RID:
+func create_vertices_buffer() -> RID:
 	#create the triangles buffer
 	var total_cells := chunk_size * chunk_size * chunk_size
-	var triangles := PackedColorArray()
-	triangles.resize(total_cells * 5 * (3 + 1)) # 5 triangles max per cell, 3 vertices and 1 normal per triangle
-	var triangles_bytes := triangles.to_byte_array()
-	var buffer_rid := rd.storage_buffer_create(triangles_bytes.size(), triangles_bytes)
+	var vertices := PackedColorArray()
+	vertices.resize(total_cells * 5 * (3 + 1)) # 5 triangles max per cell, 3 vertices and 1 normal per triangle
+	var vertices_bytes := vertices.to_byte_array()
+	var buffer_rid := rd.storage_buffer_create(vertices_bytes.size(), vertices_bytes)
 	
 	return buffer_rid
 
@@ -254,14 +257,9 @@ func unload_chunk(x: int, y: int, z: int):
 		var chunk_data = loaded_chunks[chunk_key]
 		
 		# Free GPU buffers
-		if chunk_data.has("data_buffer"):
-			safe_free_rid(chunk_data["data_buffer"])
-		if chunk_data.has("counter_buffer"):
-			safe_free_rid(chunk_data["counter_buffer"])
-		if chunk_data.has("triangles_buffer"):
-			safe_free_rid(chunk_data["triangles_buffer"])
-		if chunk_data.has("uniform_set"):
-			safe_free_rid(chunk_data["uniform_set"])
+		safe_free_rid(chunk_data["data_buffer"])
+		safe_free_rid(chunk_data["counter_buffer"])
+		safe_free_rid(chunk_data["vertices_buffer"])
 		
 		# Free the mesh node from the scene tree
 		var chunk_instance = chunk_data["mesh_node"]
@@ -296,7 +294,7 @@ func release():
 #this function returns the paramaters (aka noise values) for the mesh in the specified chunk
 func get_global_params():
 	var params := PackedFloat32Array()
-	params.append_array([chunk_size, chunk_size, chunk_size])
+	params.append_array([chunk_size + 1, chunk_size + 1, chunk_size + 1])
 	params.append(iso_level)
 	params.append(int(flat_shaded))
 	
