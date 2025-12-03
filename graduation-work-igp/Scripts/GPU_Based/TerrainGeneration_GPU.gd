@@ -27,10 +27,11 @@ func _ready():
 	player = $"../Player"
 	
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
-	noise.frequency = 0.02
+	noise.frequency = 0.01
 	noise.cellular_jitter = 0
 	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
-	noise.fractal_octaves = 5
+	noise.fractal_octaves = 1
+	noise.domain_warp_fractal_octaves = 1
 	
 	init_compute()
 	setup_global_bindings()
@@ -328,6 +329,7 @@ func get_per_chunk_params(chunk_coords: Vector3):
 		world_offset.x, world_offset.y, world_offset.z,
 		iso_level,
 		float(chunk_size),
+		float(noise.seed),
 		noise.frequency,
 		float(noise.noise_type),
 		float(noise.fractal_type),
@@ -336,7 +338,6 @@ func get_per_chunk_params(chunk_coords: Vector3):
 		noise.fractal_gain,
 		noise.fractal_weighted_strength,
 		noise.fractal_ping_pong_strength,
-		float(noise.seed),
 		
 		##padding for now, you need to supply the compute shader with 64 bytes when using constants
 		0.0,

@@ -14,6 +14,8 @@ layout(push_constant, std430) uniform Params {
     vec3 world_offset;
     float iso_level;
     int chunk_size;
+    int seed;
+
 
     // FastNoiseLite parameters
     float frequency;
@@ -24,7 +26,6 @@ layout(push_constant, std430) uniform Params {
     float fractal_gain;
     float fractal_weighted_strength;
     float fractal_ping_pong_strength;
-    int seed;
 } params;
 
 
