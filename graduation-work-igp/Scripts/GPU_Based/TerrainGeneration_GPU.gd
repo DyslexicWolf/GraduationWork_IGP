@@ -118,7 +118,7 @@ func load_chunk(x: int, y: int, z: int):
 	var vertices_buffer_rid := create_vertices_buffer()
 	var per_chunk_uniform_set := create_per_chunk_uniform_set(data_buffer_rid, counter_buffer_rid, vertices_buffer_rid)
 	loaded_chunks[chunk_key] = null
-	var compute_result := await run_compute_for_chunk(counter_buffer_rid, vertices_buffer_rid, per_chunk_uniform_set, chunk_key)
+	var compute_result := await run_compute_for_chunk(counter_buffer_rid, vertices_buffer_rid, per_chunk_uniform_set)
 	var total_triangles = compute_result["total_triangles"]
 	
 	#if there are no triangles, it's an empty chunk
@@ -149,7 +149,7 @@ func load_chunk(x: int, y: int, z: int):
 		"per_chunk_uniform_set": per_chunk_uniform_set
 		}
 
-func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, per_chunk_uniform_set: RID, chunk_key: String) -> Dictionary:
+func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, per_chunk_uniform_set: RID) -> Dictionary:
 	#reset counterbuffer to 0
 	var zero_counter := PackedInt32Array([0])
 	var counter_bytes := PackedFloat32Array([0]).to_byte_array()
@@ -163,7 +163,7 @@ func run_compute_for_chunk(counter_buffer_rid: RID, vertices_buffer_rid: RID, pe
 	rd.compute_list_dispatch(compute_list, chunk_size / 8, chunk_size / 8, chunk_size / 8)
 	rd.compute_list_end()
 	
-	#submit and wait a frame before syncing
+	#submit and wait a frame before syncing (doesnt work with chunkstoloadperframe yet)
 	rd.submit()
 	await get_tree().process_frame
 	rd.sync()

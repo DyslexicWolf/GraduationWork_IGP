@@ -36,8 +36,8 @@ chunk_size = 16
 chunks_to_load_per_frame = 1
 noise = SubResource("FastNoiseLite_23c27")
 flat_shaded = true
-render_distance = 8
-render_distance_height = 1
+render_distance = 6
+render_distance_height = 2
 
 [node name="Ground" type="MeshInstance3D" parent="."]
 transform = Transform3D(374.01376, 0, 0, 0, 0.9999994, 0, 0, 0, 299.93817, 347.94, -16, 198.183)
