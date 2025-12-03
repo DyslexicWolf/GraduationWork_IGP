@@ -20,11 +20,9 @@ var global_uniform_set: RID
 var loaded_chunks: Dictionary = {}
 var player: CharacterBody3D
 var chunk_load_queue: Array = []
-var thread: Thread
 
 func _ready():
 	player = $"../Player"
-	thread = Thread.new()
 	
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	noise.frequency = 0.01
@@ -185,7 +183,7 @@ func build_mesh_from_compute_data(total_triangles: int, output_array: PackedFloa
 	
 	#parse triangle data: each triangle is 16 floats (3 vec4 for vertices + 1 vec4 for normal)
 	for i in range(0, total_triangles * 16, 16):
-		# Extract the 3 vertices (each vertex is a vec4, so we read x, y, z and skip w)
+		#extract the 3 vertices (each vertex is a vec4, so we read x, y, z and skip w)
 		output["vertices"].push_back(Vector3(output_array[i + 0], output_array[i + 1], output_array[i + 2]))
 		output["vertices"].push_back(Vector3(output_array[i + 4], output_array[i + 5], output_array[i + 6]))
 		output["vertices"].push_back(Vector3(output_array[i + 8], output_array[i + 9], output_array[i + 10]))
@@ -194,8 +192,6 @@ func build_mesh_from_compute_data(total_triangles: int, output_array: PackedFloa
 		var normal := Vector3(output_array[i + 12], output_array[i + 13], output_array[i + 14])
 		for j in range(3):
 			output["normals"].push_back(normal)
-	
-	print("total amount of verts= " + str(output["vertices"].size()))
 	
 	#create mesh using ArrayMesh, this is more optimal than using the surfacetool
 	var mesh_data := []
@@ -212,7 +208,6 @@ func build_mesh_from_compute_data(total_triangles: int, output_array: PackedFloa
 	return array_mesh
 
 func create_data_buffer(chunk_coords: Vector3) -> RID:
-	#var data = await get_per_chunk_params(chunk_coords)
 	var data = get_per_chunk_params(chunk_coords)
 	var data_bytes = data.to_byte_array()
 	var buffer_rid := rd.storage_buffer_create(data_bytes.size(), data_bytes)
@@ -273,13 +268,12 @@ func unload_chunk(x: int, y: int, z: int):
 		safe_free_rid(chunk_data["counter_buffer"])
 		safe_free_rid(chunk_data["vertices_buffer"])
 		
-		# Free the mesh node from the scene tree
 		chunk_data["mesh_node"].queue_free()
 		
 		loaded_chunks.erase(chunk_key)
 		print("Unloaded chunk: " + chunk_key)
 
-#this function returns the paramaters (aka noise values) for the mesh in the specified chunk
+#this function returns the global paramaters 
 func get_global_params():
 	var params := PackedFloat32Array()
 	params.append_array([chunk_size + 1, chunk_size + 1, chunk_size + 1])
