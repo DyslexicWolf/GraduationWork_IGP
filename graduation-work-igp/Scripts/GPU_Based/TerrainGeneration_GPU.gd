@@ -4,8 +4,6 @@ class_name TerrainGeneration_GPU
 var rd = RenderingServer.create_local_rendering_device()
 var marching_cubes_pipeline: RID
 var marching_cubes_shader: RID
-var noise_generation_pipeline: RID
-var noise_generation_shader: RID
 var global_buffers: Array
 var global_uniform_set: RID
 
@@ -22,9 +20,11 @@ var global_uniform_set: RID
 var loaded_chunks: Dictionary = {}
 var player: CharacterBody3D
 var chunk_load_queue: Array = []
+var thread: Thread
 
 func _ready():
 	player = $"../Player"
+	thread = Thread.new()
 	
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	noise.frequency = 0.01
@@ -42,11 +42,6 @@ func init_compute():
 	var marching_cubes_shader_spirv = marching_cubes_shader_file.get_spirv()
 	marching_cubes_shader = rd.shader_create_from_spirv(marching_cubes_shader_spirv)
 	marching_cubes_pipeline = rd.compute_pipeline_create(marching_cubes_shader)
-	
-	var noise_generation_shader_file = load("res://Shaders/ComputeShaders/NoiseGeneration.glsl")
-	var noise_generation_shader_spirv = noise_generation_shader_file.get_spirv()
-	noise_generation_shader = rd.shader_create_from_spirv(noise_generation_shader_spirv)
-	noise_generation_pipeline = rd.compute_pipeline_create(noise_generation_shader)
 
 func setup_global_bindings():
 	#create the globalparams buffer
@@ -332,8 +327,6 @@ func release():
 	safe_free_rid(global_uniform_set)
 	safe_free_rid(marching_cubes_pipeline)
 	safe_free_rid(marching_cubes_shader)
-	safe_free_rid(noise_generation_pipeline)
-	safe_free_rid(noise_generation_shader)
 	
 	#only free it if you created a rendering device yourself
 	rd.free()
