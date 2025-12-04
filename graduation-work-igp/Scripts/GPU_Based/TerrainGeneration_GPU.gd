@@ -17,9 +17,12 @@ var global_uniform_set: RID
 @export var render_distance: int
 @export var render_distance_height: int
 
-var loaded_chunks: Dictionary = {}
+var rendered_chunks: Dictionary = {}
 var player: CharacterBody3D
 var chunk_load_queue: Array = []
+
+signal set_statistics(chunks_rendered: int, chunks_loaded_per_frame: int, render_distance: int, render_distance_height: int, chunk_size: int)
+signal set_chunks_rendered_text(chunks_rendered: int)
 
 func _ready():
 	player = $"../Player"
@@ -33,6 +36,7 @@ func _ready():
 	
 	init_compute()
 	setup_global_bindings()
+	set_statistics.emit(0, chunks_to_load_per_frame, render_distance, render_distance_height, chunk_size)
 
 func init_compute():
 	#create shader and pipeline for marching cubes and noise generation
@@ -67,7 +71,6 @@ func setup_global_bindings():
 	global_uniform_set = rd.uniform_set_create([input_params_uniform, lut_uniform], marching_cubes_shader, 0)
 
 func _process(_delta):
-	print("fps = " + str(Engine.get_frames_per_second()))
 	var player_chunk_x := int(player.position.x / chunk_size)
 	var player_chunk_y := int(player.position.y / chunk_size)
 	var player_chunk_z := int(player.position.z / chunk_size)
@@ -77,7 +80,7 @@ func _process(_delta):
 		for y in range(player_chunk_y - render_distance_height, player_chunk_y + render_distance_height + 1):
 			for z in range(player_chunk_z - render_distance, player_chunk_z + render_distance + 1):
 				var chunk_key := str(x) + "," + str(y) + "," + str(z)
-				if not loaded_chunks.has(chunk_key):
+				if not rendered_chunks.has(chunk_key):
 					var chunk_pos := Vector3(x, y, z)
 					var player_chunk_pos := Vector3(player_chunk_x, player_chunk_y, player_chunk_z)
 					var distance := chunk_pos.distance_to(player_chunk_pos)
@@ -100,7 +103,7 @@ func _process(_delta):
 		var vertices_buffer_rid := create_vertices_buffer()
 		var per_chunk_uniform_set := create_per_chunk_uniform_set(data_buffer_rid, counter_buffer_rid, vertices_buffer_rid)
 		
-		loaded_chunks[chunk_key] = null
+		rendered_chunks[chunk_key] = null
 		chunks_this_frame.append({
 			"key": chunk_key,
 			"x": x, "y": y, "z": z,
@@ -115,13 +118,14 @@ func _process(_delta):
 		await process_chunk_batch(chunks_this_frame)
 	
 	#unload chunks when needed
-	for key in loaded_chunks.keys().duplicate():
+	for key in rendered_chunks.keys().duplicate():
 		var coords = key.split(",")
 		var chunk_x := int(coords[0])
 		var chunk_y := int(coords[1])
 		var chunk_z := int(coords[2])
 		if abs(chunk_x - player_chunk_x) > render_distance or abs(chunk_y - player_chunk_y) > render_distance_height or abs(chunk_z - player_chunk_z) > render_distance:
 			unload_chunk(chunk_x, chunk_y, chunk_z)
+	set_chunks_rendered_text.emit(rendered_chunks.size())
 
 func process_chunk_batch(chunks: Array):
 	#reset all counter buffers
@@ -167,7 +171,7 @@ func process_chunk_batch(chunks: Array):
 			chunk_instance.create_trimesh_collision()
 		add_child(chunk_instance)
 		
-		loaded_chunks[chunk["key"]] = {
+		rendered_chunks[chunk["key"]] = {
 			"mesh_node": chunk_instance,
 			"data_buffer": chunk["data_buffer"],
 			"counter_buffer": chunk["counter_buffer"],
@@ -254,12 +258,12 @@ func create_per_chunk_uniform_set(data_buffer_rid: RID, counter_buffer_rid: RID,
 
 func unload_chunk(x: int, y: int, z: int):
 	var chunk_key := str(x) + "," + str(y) + "," + str(z)
-	if loaded_chunks.has(chunk_key):
-		if loaded_chunks[chunk_key] == null:
-			loaded_chunks.erase(chunk_key)
+	if rendered_chunks.has(chunk_key):
+		if rendered_chunks[chunk_key] == null:
+			rendered_chunks.erase(chunk_key)
 			return
 		
-		var chunk_data = loaded_chunks[chunk_key]
+		var chunk_data = rendered_chunks[chunk_key]
 		
 		#free the GPU buffers, otherwise you will have memory leaks leading to crashes
 		##free the uniform set BEFORE the buffers!!!
@@ -270,7 +274,7 @@ func unload_chunk(x: int, y: int, z: int):
 		
 		chunk_data["mesh_node"].queue_free()
 		
-		loaded_chunks.erase(chunk_key)
+		rendered_chunks.erase(chunk_key)
 		print("Unloaded chunk: " + chunk_key)
 
 #this function returns the global paramaters 
@@ -314,11 +318,11 @@ func _notification(type):
 
 #freeing all rd related things, in the correct order
 func release():
+	safe_free_rid(global_uniform_set)
 	for buffers in global_buffers:
 		safe_free_rid(buffers)
 	global_buffers.clear()
 	
-	safe_free_rid(global_uniform_set)
 	safe_free_rid(marching_cubes_pipeline)
 	safe_free_rid(marching_cubes_shader)
 	

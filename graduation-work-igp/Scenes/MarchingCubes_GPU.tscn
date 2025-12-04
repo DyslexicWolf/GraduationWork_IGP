@@ -1,9 +1,10 @@
-[gd_scene load_steps=11 format=3 uid="uid://ctf8w3p7rcpm"]
+[gd_scene load_steps=12 format=3 uid="uid://ctf8w3p7rcpm"]
 
 [ext_resource type="Script" uid="uid://b3cul5372q6v8" path="res://Scripts/GPU_Based/TerrainGeneration_GPU.gd" id="1_df2f7"]
 [ext_resource type="Material" uid="uid://dsrpobw8nocch" path="res://Materials/SMAT_Terrain.tres" id="2_0qbic"]
 [ext_resource type="Material" uid="uid://vwv7ehn3e5po" path="res://Materials/MAT_Ground.tres" id="3_e38ua"]
 [ext_resource type="Script" uid="uid://bixq1r0wgdc4p" path="res://Scripts/PlayerMovement.gd" id="4_30205"]
+[ext_resource type="Script" uid="uid://cda3fwm63dl00" path="res://Scripts/PerformanceStatistics.gd" id="5_0qbic"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_yixtj"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -29,6 +30,60 @@ glow_enabled = true
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_afunh")
 
+[node name="PerformanceStatisticsControl" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("5_0qbic")
+
+[node name="FPS_Text" type="RichTextLabel" parent="PerformanceStatisticsControl"]
+layout_mode = 1
+offset_right = 400.0
+offset_bottom = 25.0
+bbcode_enabled = true
+text = "Test"
+
+[node name="ChunksRendered_Text" type="RichTextLabel" parent="PerformanceStatisticsControl"]
+layout_mode = 1
+offset_top = 26.0
+offset_right = 400.0
+offset_bottom = 51.0
+bbcode_enabled = true
+text = "Test"
+
+[node name="ChunksLoadedPerFrame_Text" type="RichTextLabel" parent="PerformanceStatisticsControl"]
+layout_mode = 1
+offset_top = 53.0
+offset_right = 400.0
+offset_bottom = 78.0
+bbcode_enabled = true
+text = "Test"
+
+[node name="RenderDistance_Text" type="RichTextLabel" parent="PerformanceStatisticsControl"]
+layout_mode = 1
+offset_top = 80.0
+offset_right = 400.0
+offset_bottom = 105.0
+bbcode_enabled = true
+text = "Test"
+
+[node name="RenderDistanceHeight_Text" type="RichTextLabel" parent="PerformanceStatisticsControl"]
+layout_mode = 1
+offset_top = 104.0
+offset_right = 400.0
+offset_bottom = 129.0
+bbcode_enabled = true
+text = "Test"
+
+[node name="ChunkSize_Text" type="RichTextLabel" parent="PerformanceStatisticsControl"]
+layout_mode = 1
+offset_top = 129.0
+offset_right = 400.0
+offset_bottom = 154.0
+bbcode_enabled = true
+text = "Test"
+
 [node name="GeneratedTerrain_GPU" type="MeshInstance3D" parent="."]
 script = ExtResource("1_df2f7")
 terrain_material = ExtResource("2_0qbic")
@@ -52,3 +107,6 @@ script = ExtResource("4_30205")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
 shape = SubResource("CapsuleShape3D_88t3t")
+
+[connection signal="set_chunks_rendered_text" from="GeneratedTerrain_GPU" to="PerformanceStatisticsControl" method="set_chunks_rendered"]
+[connection signal="set_statistics" from="GeneratedTerrain_GPU" to="PerformanceStatisticsControl" method="set_initial_statistics_text"]
