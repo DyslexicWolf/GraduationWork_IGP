@@ -15,6 +15,10 @@ run/main_scene="uid://ccr52sn6j4do7"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://Textures/icon.svg"
 
+[autoload]
+
+NoiseSettings="*res://Scripts/NoiseSettings.gd"
+
 [input]
 
 move_left={

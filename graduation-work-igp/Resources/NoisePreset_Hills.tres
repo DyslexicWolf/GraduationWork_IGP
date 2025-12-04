@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="NoisePreset" load_steps=2 format=3 uid="uid://ca8m1srbpjjgt"]
+
+[ext_resource type="Script" uid="uid://bn758jtp6ukb" path="res://Scripts/NoisePreset.gd" id="1_78gtr"]
+
+[resource]
+script = ExtResource("1_78gtr")
+preset_name = "Hills"
+metadata/_custom_type_script = "uid://bn758jtp6ukb"

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="NoisePreset" load_steps=2 format=3 uid="uid://bn8861541tq0x"]
+
+[ext_resource type="Script" uid="uid://bn758jtp6ukb" path="res://Scripts/NoisePreset.gd" id="1_4nk6l"]
+
+[resource]
+script = ExtResource("1_4nk6l")
+preset_name = "Cellular"
+noise_type = 2
+fractal_type = 0
+fractal_octaves = 1
+fractal_lacunarity = 1.0
+frequency = 0.02
+metadata/_custom_type_script = "uid://bn758jtp6ukb"

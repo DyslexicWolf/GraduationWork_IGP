@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="NoisePreset" load_steps=2 format=3 uid="uid://c3guwyyfyjp8o"]
+
+[ext_resource type="Script" uid="uid://bn758jtp6ukb" path="res://Scripts/NoisePreset.gd" id="1_ysgfd"]
+
+[resource]
+script = ExtResource("1_ysgfd")
+preset_name = "Mountains"
+noise_type = 0
+fractal_type = 2
+fractal_octaves = 5
+fractal_lacunarity = 2.5
+fractal_gain = 0.6
+frequency = 0.015
+metadata/_custom_type_script = "uid://bn758jtp6ukb"
