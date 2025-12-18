@@ -277,7 +277,6 @@ func unload_chunk(x: int, y: int, z: int):
 		rendered_chunks.erase(chunk_key)
 		print("Unloaded chunk: " + chunk_key)
 
-#this function returns the global paramaters 
 func get_global_params():
 	var params := PackedFloat32Array()
 	params.append_array([chunk_size + 1, chunk_size + 1, chunk_size + 1])
@@ -306,17 +305,14 @@ func get_per_chunk_params(chunk_coords: Vector3):
 	assert(params != null, "Per_chunk_params should never be null")
 	return params
 
-#safely free a RID without errors if it's invalid
 func safe_free_rid(rid: RID):
 	if rid.is_valid():
 		rd.free_rid(rid)
 
 func _notification(type):
-	#this goes through if this object (the object where the script is attached to) would get deleted
 	if type == NOTIFICATION_PREDELETE:
 		release()
 
-#freeing all rd related things, in the correct order
 func release():
 	safe_free_rid(global_uniform_set)
 	for buffers in global_buffers:
