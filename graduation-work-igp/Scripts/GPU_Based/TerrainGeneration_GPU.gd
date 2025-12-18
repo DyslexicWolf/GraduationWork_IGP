@@ -1,6 +1,12 @@
 extends MeshInstance3D
 class_name TerrainGeneration_GPU_ComputeNoise
 
+enum NoiseType {
+	PERLIN = 0,
+	SIMPLEX = 1,
+	CELLULAR = 2
+}
+
 var rd = RenderingServer.create_local_rendering_device()
 var marching_cubes_pipeline: RID
 var marching_cubes_shader: RID
@@ -8,15 +14,23 @@ var global_buffers: Array
 var global_uniform_set: RID
 
 @export var terrain_material: Material
-@export var chunk_size: int = 32
-@export var chunks_to_load_per_frame: int = 4
-@export var iso_level: float = 0.0
-@export var noise_frequency: float = 0.01
-@export var noise_octaves: int = 5
-@export var flat_shaded: bool = false
-@export var terrain_terrace: int = 0
-@export var render_distance: int = 8
-@export var render_distance_height: int = 4
+@export var chunk_size: int
+@export var chunks_to_load_per_frame: int
+@export var iso_level: float
+
+@export_category("Noise Settings")
+@export var noise_type: NoiseType = NoiseType.PERLIN
+@export var noise_frequency: float
+@export var noise_octaves: int
+@export var noise_gain: float
+@export var noise_lacunarity: float
+@export_range(0.0, 1.0) var cellular_jitter: float
+
+@export_category("Rendering Settings")
+@export var flat_shaded: bool
+@export var terrain_terrace: int
+@export var render_distance: int
+@export var render_distance_height: int
 
 var rendered_chunks: Dictionary = {}
 var player: CharacterBody3D
@@ -28,15 +42,74 @@ signal set_chunks_rendered_text(chunks_rendered: int)
 func _ready():
 	player = $"../Player"
 	
-	init_compute()
+	# You can configure noise here programmatically if you want
+	configure_noise_settings()
+	
+	if not init_compute():
+		push_error("Failed to initialize compute shader!")
+		return
+	
 	setup_global_bindings()
 	set_statistics.emit(0, chunks_to_load_per_frame, render_distance, render_distance_height, chunk_size)
+	
+	print("Terrain initialized with noise type: ", NoiseType.keys()[noise_type])
 
-func init_compute():
-	var marching_cubes_shader_file = load("res://Shaders/ComputeShaders/MarchingCubes.glsl")
+func configure_noise_settings():
+	# Example configurations for different noise types
+	# You can change these values here or through the inspector
+	
+	match noise_type:
+		NoiseType.PERLIN:
+			# Good defaults for Perlin noise terrain
+			noise_frequency = 0.01
+			noise_octaves = 5
+			noise_gain = 0.5
+			noise_lacunarity = 2.0
+		
+		NoiseType.SIMPLEX:
+			# Simplex noise tends to be smoother
+			noise_frequency = 0.012
+			noise_octaves = 6
+			noise_gain = 0.5
+			noise_lacunarity = 2.0
+		
+		NoiseType.CELLULAR:
+			# Cellular/Worley noise creates interesting cave-like structures
+			noise_frequency = 0.02
+			noise_octaves = 3
+			noise_gain = 0.5
+			noise_lacunarity = 2.0
+			cellular_jitter = 1.0
+
+func init_compute() -> bool:
+	var shader_path = "res://Shaders/ComputeShaders/MarchingCubes.glsl"
+	
+	if not ResourceLoader.exists(shader_path):
+		push_error("Shader file not found at: " + shader_path)
+		return false
+	
+	var marching_cubes_shader_file = load(shader_path)
+	if marching_cubes_shader_file == null:
+		push_error("Failed to load shader file: " + shader_path)
+		return false
+	
 	var marching_cubes_shader_spirv = marching_cubes_shader_file.get_spirv()
+	if marching_cubes_shader_spirv == null:
+		push_error("Failed to compile shader to SPIRV. Make sure the shader starts with #[compute]")
+		return false
+	
 	marching_cubes_shader = rd.shader_create_from_spirv(marching_cubes_shader_spirv)
+	if not marching_cubes_shader.is_valid():
+		push_error("Failed to create shader from SPIRV")
+		return false
+	
 	marching_cubes_pipeline = rd.compute_pipeline_create(marching_cubes_shader)
+	if not marching_cubes_pipeline.is_valid():
+		push_error("Failed to create compute pipeline")
+		return false
+	
+	print("Compute shader initialized successfully!")
+	return true
 
 func setup_global_bindings():
 	var input = get_global_params()
@@ -79,7 +152,6 @@ func _process(_delta):
 	
 	chunk_load_queue.sort_custom(func(a, b): return a["distance"] < b["distance"])
 	
-	#prep chunks that will be loaded this frame
 	var chunks_this_frame = []
 	for i in range(min(chunks_to_load_per_frame, chunk_load_queue.size())):
 		var chunk_data = chunk_load_queue[i]
@@ -87,8 +159,8 @@ func _process(_delta):
 		var y = int(chunk_data["pos"].y)
 		var z = int(chunk_data["pos"].z)
 		var chunk_key := str(x) + "," + str(y) + "," + str(z)
-		var chunk_coords := Vector3(x, y, z)
 		
+		var chunk_coords := Vector3(x, y, z)
 		var data_buffer_rid := create_data_buffer(chunk_coords)
 		var counter_buffer_rid := create_counter_buffer()
 		var vertices_buffer_rid := create_vertices_buffer()
@@ -118,13 +190,11 @@ func _process(_delta):
 	set_chunks_rendered_text.emit(rendered_chunks.size())
 
 func process_chunk_batch(chunks: Array):
-	#reset counter buffers
 	var zero_counter := PackedInt32Array([0])
 	var counter_bytes := zero_counter.to_byte_array()
 	for chunk in chunks:
 		rd.buffer_update(chunk["counter_buffer"], 0, counter_bytes.size(), counter_bytes)
 	
-	#submit all compute operations in 1 compute list
 	var compute_list := rd.compute_list_begin()
 	rd.compute_list_bind_compute_pipeline(compute_list, marching_cubes_pipeline)
 	for chunk in chunks:
@@ -133,7 +203,6 @@ func process_chunk_batch(chunks: Array):
 		rd.compute_list_dispatch(compute_list, chunk_size / 8, chunk_size / 8, chunk_size / 8)
 	rd.compute_list_end()
 	
-	#submit and wait a frame before syncing
 	rd.submit()
 	await get_tree().process_frame
 	rd.sync()
@@ -174,14 +243,11 @@ func build_mesh_from_compute_data(total_triangles: int, output_array: PackedFloa
 		"normals": PackedVector3Array(),
 	}
 	
-	# Parse triangle data: each triangle is 4 vec4s (3 vertices + 1 normal)
 	for i in range(0, total_triangles * 16, 16):
-		# Extract the 3 vertices (each vertex is a vec4, so we read x, y, z and skip w)
 		output["vertices"].push_back(Vector3(output_array[i + 0], output_array[i + 1], output_array[i + 2]))
 		output["vertices"].push_back(Vector3(output_array[i + 4], output_array[i + 5], output_array[i + 6]))
 		output["vertices"].push_back(Vector3(output_array[i + 8], output_array[i + 9], output_array[i + 10]))
 		
-		# Extract the normal (indices 12, 13, 14 are x, y, z; skip index 15 which is w)
 		var normal := Vector3(output_array[i + 12], output_array[i + 13], output_array[i + 14])
 		for j in range(3):
 			output["normals"].push_back(normal)
@@ -196,7 +262,6 @@ func build_mesh_from_compute_data(total_triangles: int, output_array: PackedFloa
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data)
 	array_mesh.surface_set_material(0, terrain_material)
 	
-	assert(array_mesh != null, "Arraymesh should never be null")
 	return array_mesh
 
 func create_data_buffer(chunk_coords: Vector3) -> RID:
@@ -217,7 +282,7 @@ func create_counter_buffer() -> RID:
 func create_vertices_buffer() -> RID:
 	var total_cells := chunk_size * chunk_size * chunk_size
 	var vertices := PackedColorArray()
-	vertices.resize(total_cells * 5 * 4) # 5 triangles max per cell, 4 vec4s per triangle
+	vertices.resize(total_cells * 5 * 4)
 	var vertices_bytes := vertices.to_byte_array()
 	var buffer_rid := rd.storage_buffer_create(vertices_bytes.size(), vertices_bytes)
 	
@@ -240,9 +305,7 @@ func create_per_chunk_uniform_set(data_buffer_rid: RID, counter_buffer_rid: RID,
 	vertices_uniform.binding = 2
 	vertices_uniform.add_id(vertices_buffer_rid)
 	
-	var per_chunk_uniform_set := rd.uniform_set_create([data_uniform, counter_uniform, vertices_uniform], marching_cubes_shader, 1)
-	assert(per_chunk_uniform_set != null, "Per_chunk_uniform_set should never be null")
-	return per_chunk_uniform_set
+	return rd.uniform_set_create([data_uniform, counter_uniform, vertices_uniform], marching_cubes_shader, 1)
 
 func unload_chunk(x: int, y: int, z: int):
 	var chunk_key := str(x) + "," + str(y) + "," + str(z)
@@ -267,15 +330,19 @@ func get_global_params():
 	var params := PackedFloat32Array()
 	#grid size
 	params.append_array([chunk_size + 1, chunk_size + 1, chunk_size + 1])
+	
 	params.append(iso_level)
 	params.append(float(flat_shaded))
-	
-	#noise parameters
 	params.append(noise_frequency)
 	params.append(float(noise_octaves))
 	params.append(float(terrain_terrace))
 	
-	assert(params != null, "Global_params should never be null")
+	#0=Perlin, 1=Simplex, 2=Cellular
+	params.append(float(noise_type))
+	params.append(noise_gain)
+	params.append(noise_lacunarity)
+	params.append(cellular_jitter)
+	
 	return params
 
 func get_per_chunk_params(chunk_coords: Vector3):
@@ -283,7 +350,6 @@ func get_per_chunk_params(chunk_coords: Vector3):
 	params.append_array([chunk_coords.x, chunk_coords.y, chunk_coords.z])
 	params.append(float(chunk_size))
 	
-	assert(params != null, "Per_chunk_params should never be null")
 	return params
 
 func safe_free_rid(rid: RID):
