@@ -1,5 +1,5 @@
 extends MeshInstance3D
-class_name TerrainGeneration_GPU
+class_name TerrainGeneration_GPU_ComputeNoise
 
 var rd = RenderingServer.create_local_rendering_device()
 var marching_cubes_pipeline: RID
@@ -8,14 +8,15 @@ var global_buffers: Array
 var global_uniform_set: RID
 
 @export var terrain_material: Material
-@export var chunk_size: int
-@export var chunks_to_load_per_frame: int
-@export var iso_level: float
-@export var noise: FastNoiseLite
-@export var flat_shaded: bool
-@export var terrain_terrace: int
-@export var render_distance: int
-@export var render_distance_height: int
+@export var chunk_size: int = 32
+@export var chunks_to_load_per_frame: int = 4
+@export var iso_level: float = 0.0
+@export var noise_frequency: float = 0.01
+@export var noise_octaves: int = 5
+@export var flat_shaded: bool = false
+@export var terrain_terrace: int = 0
+@export var render_distance: int = 8
+@export var render_distance_height: int = 4
 
 var rendered_chunks: Dictionary = {}
 var player: CharacterBody3D
@@ -27,26 +28,17 @@ signal set_chunks_rendered_text(chunks_rendered: int)
 func _ready():
 	player = $"../Player"
 	
-	noise.noise_type = FastNoiseLite.TYPE_PERLIN
-	noise.frequency = 0.01
-	noise.cellular_jitter = 0
-	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
-	noise.fractal_octaves = 5
-	noise.domain_warp_fractal_octaves = 1
-	
 	init_compute()
 	setup_global_bindings()
 	set_statistics.emit(0, chunks_to_load_per_frame, render_distance, render_distance_height, chunk_size)
 
 func init_compute():
-	#create shader and pipeline for marching cubes and noise generation
 	var marching_cubes_shader_file = load("res://Shaders/ComputeShaders/MarchingCubes.glsl")
 	var marching_cubes_shader_spirv = marching_cubes_shader_file.get_spirv()
 	marching_cubes_shader = rd.shader_create_from_spirv(marching_cubes_shader_spirv)
 	marching_cubes_pipeline = rd.compute_pipeline_create(marching_cubes_shader)
 
 func setup_global_bindings():
-	#create the globalparams buffer
 	var input = get_global_params()
 	var input_bytes = input.to_byte_array()
 	global_buffers.push_back(rd.storage_buffer_create(input_bytes.size(), input_bytes))
@@ -56,7 +48,6 @@ func setup_global_bindings():
 	input_params_uniform.binding = 0
 	input_params_uniform.add_id(global_buffers[0])
 	
-	#create the lookuptable buffer
 	var lut_array := PackedInt32Array()
 	for i in range(GlobalConstants.LOOKUPTABLE.size()):
 		lut_array.append_array(GlobalConstants.LOOKUPTABLE[i])
@@ -88,7 +79,7 @@ func _process(_delta):
 	
 	chunk_load_queue.sort_custom(func(a, b): return a["distance"] < b["distance"])
 	
-	#prepare all the chunks to load this frame
+	#prep chunks that will be loaded this frame
 	var chunks_this_frame = []
 	for i in range(min(chunks_to_load_per_frame, chunk_load_queue.size())):
 		var chunk_data = chunk_load_queue[i]
@@ -96,8 +87,8 @@ func _process(_delta):
 		var y = int(chunk_data["pos"].y)
 		var z = int(chunk_data["pos"].z)
 		var chunk_key := str(x) + "," + str(y) + "," + str(z)
-		
 		var chunk_coords := Vector3(x, y, z)
+		
 		var data_buffer_rid := create_data_buffer(chunk_coords)
 		var counter_buffer_rid := create_counter_buffer()
 		var vertices_buffer_rid := create_vertices_buffer()
@@ -113,11 +104,10 @@ func _process(_delta):
 			"uniform_set": per_chunk_uniform_set
 		})
 	
-	#process all chunks to be loaded in one batch
 	if chunks_this_frame.size() > 0:
 		await process_chunk_batch(chunks_this_frame)
 	
-	#unload chunks when needed
+	#unload chunks if needed
 	for key in rendered_chunks.keys().duplicate():
 		var coords = key.split(",")
 		var chunk_x := int(coords[0])
@@ -128,13 +118,13 @@ func _process(_delta):
 	set_chunks_rendered_text.emit(rendered_chunks.size())
 
 func process_chunk_batch(chunks: Array):
-	#reset all counter buffers
+	#reset counter buffers
 	var zero_counter := PackedInt32Array([0])
 	var counter_bytes := zero_counter.to_byte_array()
 	for chunk in chunks:
 		rd.buffer_update(chunk["counter_buffer"], 0, counter_bytes.size(), counter_bytes)
 	
-	#submit all compute operations in one compute list, dispatch per chunk
+	#submit all compute operations in 1 compute list
 	var compute_list := rd.compute_list_begin()
 	rd.compute_list_bind_compute_pipeline(compute_list, marching_cubes_pipeline)
 	for chunk in chunks:
@@ -143,12 +133,11 @@ func process_chunk_batch(chunks: Array):
 		rd.compute_list_dispatch(compute_list, chunk_size / 8, chunk_size / 8, chunk_size / 8)
 	rd.compute_list_end()
 	
-	#submit and wait a frame before syncing CPU with GPU
+	#submit and wait a frame before syncing
 	rd.submit()
 	await get_tree().process_frame
-	rd.sync ()
+	rd.sync()
 	
-	#process results for each chunk
 	for chunk in chunks:
 		var total_triangles := rd.buffer_get_data(chunk["counter_buffer"]).to_int32_array()[0]
 		
@@ -185,19 +174,18 @@ func build_mesh_from_compute_data(total_triangles: int, output_array: PackedFloa
 		"normals": PackedVector3Array(),
 	}
 	
-	#parse triangle data: each triangle is 16 floats (3 vec4 for vertices + 1 vec4 for normal)
+	# Parse triangle data: each triangle is 4 vec4s (3 vertices + 1 normal)
 	for i in range(0, total_triangles * 16, 16):
-		#extract the 3 vertices (each vertex is a vec4, so we read x, y, z and skip w)
+		# Extract the 3 vertices (each vertex is a vec4, so we read x, y, z and skip w)
 		output["vertices"].push_back(Vector3(output_array[i + 0], output_array[i + 1], output_array[i + 2]))
 		output["vertices"].push_back(Vector3(output_array[i + 4], output_array[i + 5], output_array[i + 6]))
 		output["vertices"].push_back(Vector3(output_array[i + 8], output_array[i + 9], output_array[i + 10]))
 		
-		#extract the normal (indices 12, 13, 14 are x, y, z; skip index 15 which is w)
+		# Extract the normal (indices 12, 13, 14 are x, y, z; skip index 15 which is w)
 		var normal := Vector3(output_array[i + 12], output_array[i + 13], output_array[i + 14])
 		for j in range(3):
 			output["normals"].push_back(normal)
 	
-	#create mesh using ArrayMesh, this is more optimal than using the surfacetool
 	var mesh_data := []
 	mesh_data.resize(Mesh.ARRAY_MAX)
 	mesh_data[Mesh.ARRAY_VERTEX] = output["vertices"]
@@ -220,7 +208,7 @@ func create_data_buffer(chunk_coords: Vector3) -> RID:
 	return buffer_rid
 
 func create_counter_buffer() -> RID:
-	var counter_bytes := PackedFloat32Array([0]).to_byte_array()
+	var counter_bytes := PackedInt32Array([0]).to_byte_array()
 	var buffer_rid := rd.storage_buffer_create(counter_bytes.size(), counter_bytes)
 	
 	assert(buffer_rid != null, "Counter_buffer_rid should never be null")
@@ -229,7 +217,7 @@ func create_counter_buffer() -> RID:
 func create_vertices_buffer() -> RID:
 	var total_cells := chunk_size * chunk_size * chunk_size
 	var vertices := PackedColorArray()
-	vertices.resize(total_cells * 5 * (3 + 1)) # 5 triangles max per cell, 3 vertices and 1 normal per triangle
+	vertices.resize(total_cells * 5 * 4) # 5 triangles max per cell, 4 vec4s per triangle
 	var vertices_bytes := vertices.to_byte_array()
 	var buffer_rid := rd.storage_buffer_create(vertices_bytes.size(), vertices_bytes)
 	
@@ -265,8 +253,6 @@ func unload_chunk(x: int, y: int, z: int):
 		
 		var chunk_data = rendered_chunks[chunk_key]
 		
-		#free the GPU buffers, otherwise you will have memory leaks leading to crashes
-		##free the uniform set BEFORE the buffers!!!
 		safe_free_rid(chunk_data["per_chunk_uniform_set"])
 		safe_free_rid(chunk_data["data_buffer"])
 		safe_free_rid(chunk_data["counter_buffer"])
@@ -279,29 +265,24 @@ func unload_chunk(x: int, y: int, z: int):
 
 func get_global_params():
 	var params := PackedFloat32Array()
+	#grid size
 	params.append_array([chunk_size + 1, chunk_size + 1, chunk_size + 1])
 	params.append(iso_level)
-	params.append(int(flat_shaded))
+	params.append(float(flat_shaded))
+	
+	#noise parameters
+	params.append(noise_frequency)
+	params.append(float(noise_octaves))
+	params.append(float(terrain_terrace))
 	
 	assert(params != null, "Global_params should never be null")
 	return params
 
 func get_per_chunk_params(chunk_coords: Vector3):
-	var voxel_grid := VoxelGrid.new(chunk_size + 1, iso_level)
-	var world_offset: Vector3 = chunk_coords * chunk_size
-	
-	for x in range(chunk_size + 1):
-		for y in range(chunk_size + 1):
-			for z in range(chunk_size + 1):
-				var world_x := world_offset.x + x
-				var world_y := world_offset.y + y
-				var world_z := world_offset.z + z
-				#var value := noise.get_noise_3d(world_x, world_y, world_z)+(y+y%terrain_terrace)/float(voxel_grid.resolution)-0.5
-				var value := noise.get_noise_3d(world_x, world_y, world_z)
-				voxel_grid.write(x, y, z, value)
-	
 	var params := PackedFloat32Array()
-	params.append_array(voxel_grid.data)
+	params.append_array([chunk_coords.x, chunk_coords.y, chunk_coords.z])
+	params.append(float(chunk_size))
+	
 	assert(params != null, "Per_chunk_params should never be null")
 	return params
 
@@ -322,5 +303,5 @@ func release():
 	safe_free_rid(marching_cubes_pipeline)
 	safe_free_rid(marching_cubes_shader)
 	
-	#only free it if you created a rendering device yourself
+	# Only free it if you created a rendering device yourself
 	rd.free()
