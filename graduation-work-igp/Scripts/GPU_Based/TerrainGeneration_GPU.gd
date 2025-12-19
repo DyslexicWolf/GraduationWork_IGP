@@ -13,18 +13,11 @@ var marching_cubes_shader: RID
 var global_buffers: Array
 var global_uniform_set: RID
 
+@export_category("General Settings")
 @export var terrain_material: Material
 @export var chunk_size: int
 @export var chunks_to_load_per_frame: int
 @export var iso_level: float
-
-@export_category("Noise Settings")
-@export var noise_type: NoiseType = NoiseType.PERLIN
-@export var noise_frequency: float
-@export var noise_octaves: int
-@export var noise_gain: float
-@export var noise_lacunarity: float
-@export_range(0.0, 1.0) var cellular_jitter: float
 
 @export_category("Rendering Settings")
 @export var flat_shaded: bool
@@ -42,9 +35,6 @@ signal set_chunks_rendered_text(chunks_rendered: int)
 func _ready():
 	player = $"../Player"
 	
-	# You can configure noise here programmatically if you want
-	configure_noise_settings()
-	
 	if not init_compute():
 		push_error("Failed to initialize compute shader!")
 		return
@@ -52,29 +42,6 @@ func _ready():
 	setup_global_bindings()
 	set_statistics.emit(0, chunks_to_load_per_frame, render_distance, render_distance_height, chunk_size)
 	
-	print("Terrain initialized with noise type: ", NoiseType.keys()[noise_type])
-
-#to be replaced
-func configure_noise_settings():
-	match noise_type:
-		NoiseType.PERLIN:
-			noise_frequency = 0.01
-			noise_octaves = 5
-			noise_gain = 0.5
-			noise_lacunarity = 2.0
-		
-		NoiseType.SIMPLEX:
-			noise_frequency = 0.012
-			noise_octaves = 6
-			noise_gain = 0.5
-			noise_lacunarity = 2.0
-		
-		NoiseType.CELLULAR:
-			noise_frequency = 0.02
-			noise_octaves = 3
-			noise_gain = 0.5
-			noise_lacunarity = 2.0
-			cellular_jitter = 1.0
 
 func init_compute() -> bool:
 	var shader_path = "res://Shaders/ComputeShaders/MarchingCubes.glsl"
@@ -329,16 +296,16 @@ func get_global_params():
 	params.append(iso_level)
 	#1 == true, 0 == false
 	params.append(float(flat_shaded))
-	params.append(noise_frequency)
-	params.append(float(noise_octaves))
+	params.append(NoiseConfig.noise_frequency)
+	params.append(float(NoiseConfig.fractal_octaves))
 	#1 == true, 0 == false
 	params.append(float(terrain_terrace))
 	
 	#0=Perlin, 1=Simplex, 2=Cellular
-	params.append(float(noise_type))
-	params.append(noise_gain)
-	params.append(noise_lacunarity)
-	params.append(cellular_jitter)
+	params.append(float(NoiseConfig.noise_type))
+	params.append(NoiseConfig.fractal_gain)
+	params.append(NoiseConfig.fractal_lacunarity)
+	params.append(NoiseConfig.cellular_jitter)
 	
 	return params
 
