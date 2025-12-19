@@ -5,4 +5,7 @@
 [resource]
 script = ExtResource("1_78gtr")
 preset_name = "Hills"
+noise_type = 1
+noise_frequency = 0.012
+fractal_octaves = 6
 metadata/_custom_type_script = "uid://bn758jtp6ukb"

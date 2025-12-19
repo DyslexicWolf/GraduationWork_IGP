@@ -4,10 +4,8 @@
 
 [resource]
 script = ExtResource("1_4nk6l")
-preset_name = "Cellular"
+preset_name = "Caves"
 noise_type = 2
-fractal_type = 0
-fractal_octaves = 1
-fractal_lacunarity = 1.0
-frequency = 0.02
+noise_frequency = 0.02
+cellular_jitter = 1.0
 metadata/_custom_type_script = "uid://bn758jtp6ukb"

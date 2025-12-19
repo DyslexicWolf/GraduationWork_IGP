@@ -1,14 +1,6 @@
-extends Resource
-class_name NoisePreset
+extends Node
 
-enum NoiseType {
-	PERLIN = 0,
-	SIMPLEX = 1,
-	CELLULAR = 2
-}
-
-@export var preset_name: String = "Default"
-@export var noise_type: NoiseType = NoiseType.PERLIN
+@export var noise_type: int
 @export var noise_seed: int = 1337
 @export var noise_frequency: float = 0.01
 @export var fractal_octaves: int = 3

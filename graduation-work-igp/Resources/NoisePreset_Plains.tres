@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_lvcew")
 preset_name = "Plains"
-noise_type = 1
+noise_type = 0
 fractal_octaves = 2
 fractal_gain = 0.4
 frequency = 0.008

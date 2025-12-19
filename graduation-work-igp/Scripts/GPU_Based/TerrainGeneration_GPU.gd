@@ -54,27 +54,22 @@ func _ready():
 	
 	print("Terrain initialized with noise type: ", NoiseType.keys()[noise_type])
 
+#to be replaced
 func configure_noise_settings():
-	# Example configurations for different noise types
-	# You can change these values here or through the inspector
-	
 	match noise_type:
 		NoiseType.PERLIN:
-			# Good defaults for Perlin noise terrain
 			noise_frequency = 0.01
 			noise_octaves = 5
 			noise_gain = 0.5
 			noise_lacunarity = 2.0
 		
 		NoiseType.SIMPLEX:
-			# Simplex noise tends to be smoother
 			noise_frequency = 0.012
 			noise_octaves = 6
 			noise_gain = 0.5
 			noise_lacunarity = 2.0
 		
 		NoiseType.CELLULAR:
-			# Cellular/Worley noise creates interesting cave-like structures
 			noise_frequency = 0.02
 			noise_octaves = 3
 			noise_gain = 0.5
@@ -332,9 +327,11 @@ func get_global_params():
 	params.append_array([chunk_size + 1, chunk_size + 1, chunk_size + 1])
 	
 	params.append(iso_level)
+	#1 == true, 0 == false
 	params.append(float(flat_shaded))
 	params.append(noise_frequency)
 	params.append(float(noise_octaves))
+	#1 == true, 0 == false
 	params.append(float(terrain_terrace))
 	
 	#0=Perlin, 1=Simplex, 2=Cellular

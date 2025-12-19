@@ -17,7 +17,11 @@ config/icon="res://Textures/icon.svg"
 
 [autoload]
 
-NoiseSettings="*res://Scripts/NoiseSettings.gd"
+NoiseConfig="*res://Scripts/NoiseConfig.gd"
+
+[display]
+
+window/stretch/mode="viewport"
 
 [input]
 

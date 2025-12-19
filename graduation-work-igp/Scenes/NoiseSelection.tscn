@@ -4,74 +4,237 @@
 [ext_resource type="Script" uid="uid://bn758jtp6ukb" path="res://Scripts/NoisePreset.gd" id="2_bvrih"]
 [ext_resource type="Resource" uid="uid://gaaxk3j4jjy3" path="res://Resources/NoisePreset_Plains.tres" id="3_x4hue"]
 [ext_resource type="Resource" uid="uid://ca8m1srbpjjgt" path="res://Resources/NoisePreset_Hills.tres" id="4_208il"]
-[ext_resource type="Resource" uid="uid://c3guwyyfyjp8o" path="res://Resources/NoisePreset_Mountain.tres" id="5_ctljd"]
-[ext_resource type="Resource" uid="uid://bn8861541tq0x" path="res://Resources/NoisePreset_Cellular.tres" id="6_1d2ir"]
+[ext_resource type="Resource" uid="uid://bn8861541tq0x" path="res://Resources/NoisePreset_Cellular.tres" id="5_ctljd"]
+[ext_resource type="Resource" uid="uid://c3guwyyfyjp8o" path="res://Resources/NoisePreset_Mountain.tres" id="6_1d2ir"]
 
 [node name="NoiseSelection" type="Control"]
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1_qmqe7")
 presets = Array[ExtResource("2_bvrih")]([ExtResource("3_x4hue"), ExtResource("4_208il"), ExtResource("5_ctljd"), ExtResource("6_1d2ir")])
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
+[node name="Undecided_VBoxContainer" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -75.0
+offset_right = 200.0
+offset_bottom = 75.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 15
 
-[node name="PresetName" type="Label" parent="VBoxContainer"]
+[node name="Label" type="Label" parent="Undecided_VBoxContainer"]
+custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
+size_flags_horizontal = 4
+text = "Choose 1 of the preset noise generators or create your own."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
 
-[node name="PresetNavContainer" type="HBoxContainer" parent="VBoxContainer"]
+[node name="PresetButton" type="Button" parent="Undecided_VBoxContainer"]
+custom_minimum_size = Vector2(200, 35)
 layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+text = "Preset Noise Generators"
 
-[node name="PrevButton" type="Button" parent="VBoxContainer/PresetNavContainer"]
+[node name="CustomButton" type="Button" parent="Undecided_VBoxContainer"]
+custom_minimum_size = Vector2(200, 35)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+text = "Create Custom Generator"
+
+[node name="Preset_VBoxContainer" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -75.0
+offset_right = 200.0
+offset_bottom = 75.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 15
+
+[node name="PresetNameText" type="Label" parent="Preset_VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="PresetNavContainer" type="HBoxContainer" parent="Preset_VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+
+[node name="PresetPrevButton" type="Button" parent="Preset_VBoxContainer/PresetNavContainer"]
 custom_minimum_size = Vector2(50, 0)
 layout_mode = 2
 text = "<"
 
-[node name="NextButton" type="Button" parent="VBoxContainer/PresetNavContainer"]
+[node name="PresetNextButton" type="Button" parent="Preset_VBoxContainer/PresetNavContainer"]
 custom_minimum_size = Vector2(50, 0)
 layout_mode = 2
 text = ">"
 
-[node name="SeedContainer" type="HBoxContainer" parent="VBoxContainer"]
+[node name="StartGameButton" type="Button" parent="Preset_VBoxContainer"]
+custom_minimum_size = Vector2(125, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 10
+text = "Start Game"
+
+[node name="BackButton" type="Button" parent="Preset_VBoxContainer"]
+custom_minimum_size = Vector2(100, 35)
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 10
+text = "Back"
+
+[node name="Custom_VBoxContainer" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -300.0
+offset_right = 200.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+
+[node name="NoiseTypeContainer" type="HBoxContainer" parent="Custom_VBoxContainer"]
+layout_mode = 2
+
+[node name="NoiseTypeText" type="Label" parent="Custom_VBoxContainer/NoiseTypeContainer"]
+layout_mode = 2
+text = "Noisetype: Perlin"
+
+[node name="NoiseTypePrevButton" type="Button" parent="Custom_VBoxContainer/NoiseTypeContainer"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = "<"
+
+[node name="NoiseTypeNextButton" type="Button" parent="Custom_VBoxContainer/NoiseTypeContainer"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = ">"
+
+[node name="SeedContainer" type="HBoxContainer" parent="Custom_VBoxContainer"]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 
-[node name="SeedText" type="Label" parent="VBoxContainer/SeedContainer"]
+[node name="SeedText" type="Label" parent="Custom_VBoxContainer/SeedContainer"]
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "Seed:"
 
-[node name="SeedEntryField" type="SpinBox" parent="VBoxContainer/SeedContainer"]
+[node name="SeedEntryField" type="SpinBox" parent="Custom_VBoxContainer/SeedContainer"]
 layout_mode = 2
 
-[node name="SeedRandomButton" type="Button" parent="VBoxContainer/SeedContainer"]
+[node name="SeedRandomButton" type="Button" parent="Custom_VBoxContainer/SeedContainer"]
 layout_mode = 2
 text = "Random"
 
-[node name="FrequencyContainer" type="HBoxContainer" parent="VBoxContainer"]
+[node name="FrequencyContainer" type="HBoxContainer" parent="Custom_VBoxContainer"]
 custom_minimum_size = Vector2(150, 25)
 layout_mode = 2
 
-[node name="FrequencyText" type="Label" parent="VBoxContainer/FrequencyContainer"]
+[node name="FrequencyText" type="Label" parent="Custom_VBoxContainer/FrequencyContainer"]
 layout_mode = 2
 text = "Frequency:"
 
-[node name="FrequencySlider" type="HSlider" parent="VBoxContainer/FrequencyContainer"]
-custom_minimum_size = Vector2(150, 25)
+[node name="FrequencyEntryField" type="SpinBox" parent="Custom_VBoxContainer/FrequencyContainer"]
 layout_mode = 2
 
-[node name="FrequencyValue" type="Label" parent="VBoxContainer/FrequencyContainer"]
+[node name="OctavesContainer" type="HBoxContainer" parent="Custom_VBoxContainer"]
 layout_mode = 2
 
-[node name="StartGameButton" type="Button" parent="VBoxContainer"]
+[node name="OctavesText" type="Label" parent="Custom_VBoxContainer/OctavesContainer"]
 layout_mode = 2
+text = "Octaves: "
+
+[node name="OctavesEntryField" type="SpinBox" parent="Custom_VBoxContainer/OctavesContainer"]
+layout_mode = 2
+
+[node name="GainContainer" type="HBoxContainer" parent="Custom_VBoxContainer"]
+layout_mode = 2
+
+[node name="GainText" type="Label" parent="Custom_VBoxContainer/GainContainer"]
+layout_mode = 2
+text = "Gain: "
+
+[node name="GainEntryField" type="SpinBox" parent="Custom_VBoxContainer/GainContainer"]
+layout_mode = 2
+
+[node name="LacunarityContainer" type="HBoxContainer" parent="Custom_VBoxContainer"]
+layout_mode = 2
+
+[node name="LacunarityText" type="Label" parent="Custom_VBoxContainer/LacunarityContainer"]
+layout_mode = 2
+text = "Lacunarity: "
+
+[node name="LacunarityEntryField" type="SpinBox" parent="Custom_VBoxContainer/LacunarityContainer"]
+layout_mode = 2
+
+[node name="CellularJitterContainer" type="HBoxContainer" parent="Custom_VBoxContainer"]
+layout_mode = 2
+
+[node name="CellularJitterText" type="Label" parent="Custom_VBoxContainer/CellularJitterContainer"]
+layout_mode = 2
+text = "Cellular jitter: "
+
+[node name="CellularJitterEntryField" type="SpinBox" parent="Custom_VBoxContainer/CellularJitterContainer"]
+layout_mode = 2
+
+[node name="StartGameButton" type="Button" parent="Custom_VBoxContainer"]
+custom_minimum_size = Vector2(125, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 10
 text = "Start Game"
 
-[connection signal="pressed" from="VBoxContainer/PresetNavContainer/PrevButton" to="." method="_on_prev_button_pressed"]
-[connection signal="pressed" from="VBoxContainer/PresetNavContainer/NextButton" to="." method="_on_next_button_pressed"]
-[connection signal="changed" from="VBoxContainer/SeedContainer/SeedEntryField" to="." method="_on_seed_changed"]
-[connection signal="pressed" from="VBoxContainer/SeedContainer/SeedRandomButton" to="." method="_on_random_seed_pressed"]
-[connection signal="changed" from="VBoxContainer/FrequencyContainer/FrequencySlider" to="." method="_on_frequency_changed"]
-[connection signal="pressed" from="VBoxContainer/StartGameButton" to="." method="_on_start_game_pressed"]
+[node name="BackButton" type="Button" parent="Custom_VBoxContainer"]
+custom_minimum_size = Vector2(100, 35)
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 10
+text = "Back"
+
+[connection signal="pressed" from="Undecided_VBoxContainer/PresetButton" to="." method="on_preset_button_pressed"]
+[connection signal="pressed" from="Undecided_VBoxContainer/CustomButton" to="." method="on_custom_button_pressed"]
+[connection signal="pressed" from="Preset_VBoxContainer/PresetNavContainer/PresetPrevButton" to="." method="on_preset_prev_button_pressed"]
+[connection signal="pressed" from="Preset_VBoxContainer/PresetNavContainer/PresetNextButton" to="." method="on_preset_next_button_pressed"]
+[connection signal="pressed" from="Preset_VBoxContainer/StartGameButton" to="." method="on_start_game_pressed"]
+[connection signal="pressed" from="Preset_VBoxContainer/BackButton" to="." method="on_back_button_pressed"]
+[connection signal="pressed" from="Custom_VBoxContainer/NoiseTypeContainer/NoiseTypePrevButton" to="." method="on_noise_type_prev_button_pressed"]
+[connection signal="pressed" from="Custom_VBoxContainer/NoiseTypeContainer/NoiseTypeNextButton" to="." method="on_noise_type_next_button_pressed"]
+[connection signal="value_changed" from="Custom_VBoxContainer/SeedContainer/SeedEntryField" to="." method="on_seed_changed"]
+[connection signal="pressed" from="Custom_VBoxContainer/SeedContainer/SeedRandomButton" to="." method="on_random_seed_pressed"]
+[connection signal="value_changed" from="Custom_VBoxContainer/FrequencyContainer/FrequencyEntryField" to="." method="on_frequency_changed"]
+[connection signal="value_changed" from="Custom_VBoxContainer/OctavesContainer/OctavesEntryField" to="." method="on_octaves_changed"]
+[connection signal="value_changed" from="Custom_VBoxContainer/GainContainer/GainEntryField" to="." method="on_gain_changed"]
+[connection signal="value_changed" from="Custom_VBoxContainer/LacunarityContainer/LacunarityEntryField" to="." method="on_lacunarity_changed"]
+[connection signal="value_changed" from="Custom_VBoxContainer/CellularJitterContainer/CellularJitterEntryField" to="." method="on_cellular_jitter_changed"]
+[connection signal="pressed" from="Custom_VBoxContainer/StartGameButton" to="." method="on_start_game_pressed"]
+[connection signal="pressed" from="Custom_VBoxContainer/BackButton" to="." method="on_back_button_pressed"]
