@@ -15,21 +15,20 @@ void fragment() {
 	//INV_VIEW_MATRIX, transforms the location of the pixels on your screen to world coords (use this if you want world coords)
 	//MODEL_MATRIX, transforms the location of the coords of a model in modelspace to world coords
 	vec3 world_pos = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	
+
 	// Calculate height factor (0.0 to 1.0)
 	float height_factor = clamp((world_pos.y - min_height) / (max_height - min_height), 0.0, 1.0);
-	
-	
+
 	vec3 color;
 	if (height_factor < 0.33) {
 	color = mix(color1, color2, height_factor * 3.0);
-	} 
+	}
 	else if (height_factor < 0.66) {
 	color = mix(color2, color3, (height_factor - 0.33) * 3.0);
-	} 
+	}
 	else {
 	color = mix(color3, color4, (height_factor - 0.66) * 3.0);
 	}
-	
+
 	ALBEDO = color;
 }

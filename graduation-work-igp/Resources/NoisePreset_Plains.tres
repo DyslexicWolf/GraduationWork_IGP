@@ -5,8 +5,6 @@
 [resource]
 script = ExtResource("1_lvcew")
 preset_name = "Plains"
-noise_type = 0
-fractal_octaves = 2
+fractal_octaves = 5
 fractal_gain = 0.4
-frequency = 0.008
 metadata/_custom_type_script = "uid://bn758jtp6ukb"

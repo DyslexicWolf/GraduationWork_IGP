@@ -1,8 +1,7 @@
-[gd_scene load_steps=11 format=3 uid="uid://ctf8w3p7rcpm"]
+[gd_scene load_steps=10 format=3 uid="uid://ctf8w3p7rcpm"]
 
 [ext_resource type="Script" uid="uid://b3cul5372q6v8" path="res://Scripts/GPU_Based/TerrainGeneration_GPU.gd" id="1_df2f7"]
 [ext_resource type="Material" uid="uid://dsrpobw8nocch" path="res://Materials/SMAT_Terrain.tres" id="2_0qbic"]
-[ext_resource type="Material" uid="uid://vwv7ehn3e5po" path="res://Materials/MAT_Ground.tres" id="3_e38ua"]
 [ext_resource type="Script" uid="uid://bixq1r0wgdc4p" path="res://Scripts/PlayerMovement.gd" id="4_30205"]
 [ext_resource type="Script" uid="uid://cda3fwm63dl00" path="res://Scripts/PerformanceStatistics.gd" id="5_0qbic"]
 
@@ -18,8 +17,19 @@ background_mode = 2
 sky = SubResource("Sky_8ugv2")
 tonemap_mode = 2
 glow_enabled = true
+fog_enabled = true
+fog_mode = 1
+fog_density = 1.0
+fog_depth_begin = 64.0
+fog_depth_end = 128.0
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_7mg7n"]
+[sub_resource type="GDScript" id="GDScript_23c27"]
+script/source = "extends WorldEnvironment
+
+func on_generated_terrain_set_fog_settings(render_distance: int) -> void:
+	self.environment.fog_depth_begin = (render_distance / 2) * 32 - 16
+	self.environment.fog_depth_end = render_distance * 32
+"
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_88t3t"]
 
@@ -27,6 +37,7 @@ glow_enabled = true
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_afunh")
+script = SubResource("GDScript_23c27")
 
 [node name="PerformanceStatisticsControl" type="Control" parent="."]
 layout_mode = 3
@@ -86,30 +97,21 @@ text = "Test"
 script = ExtResource("1_df2f7")
 terrain_material = ExtResource("2_0qbic")
 chunk_size = 16
-chunks_to_load_per_frame = 1
-noise_type = 2
-noise_frequency = 0.01
-noise_octaves = 6
-noise_gain = 0.5
-noise_lacunarity = 2.0
-cellular_jitter = 1.0
+chunks_to_load_per_frame = 4
 flat_shaded = true
 render_distance = 6
 render_distance_height = 2
 
-[node name="Ground" type="MeshInstance3D" parent="."]
-transform = Transform3D(374.01376, 0, 0, 0, 0.9999994, 0, 0, 0, 299.93817, 347.94, -16, 198.183)
-material_override = ExtResource("3_e38ua")
-mesh = SubResource("PlaneMesh_7mg7n")
-
 [node name="Player" type="CharacterBody3D" parent="."]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 29.221186, 1, 32.41128)
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 16, 16, 16)
 script = ExtResource("4_30205")
 
 [node name="Camera3D" type="Camera3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
 shape = SubResource("CapsuleShape3D_88t3t")
 
 [connection signal="set_chunks_rendered_text" from="GeneratedTerrain_GPU" to="PerformanceStatisticsControl" method="set_chunks_rendered"]
+[connection signal="set_fog_settings" from="GeneratedTerrain_GPU" to="WorldEnvironment" method="on_generated_terrain_set_fog_settings"]
 [connection signal="set_statistics" from="GeneratedTerrain_GPU" to="PerformanceStatisticsControl" method="set_initial_statistics_text"]
