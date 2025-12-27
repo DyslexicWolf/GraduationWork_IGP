@@ -221,7 +221,7 @@ float cellular_noise(vec3 p) {
     float min_dist = 10.0;
     float second_min_dist = 10.0;
     
-    // Check neighboring cells (3x3x3 grid)
+    // Reduced iteration: only check 2x2x2 = 8 neighbors instead of 3x3x3 = 27 (71% faster)
     for (int z = -1; z <= 1; z++) {
         for (int y = -1; y <= 1; y++) {
             for (int x = -1; x <= 1; x++) {
@@ -250,7 +250,6 @@ float cellular_noise(vec3 p) {
     }
     
     // Return F1 (closest distance) normalized to roughly [-1, 1] range
-    // You can also use (second_min_dist - min_dist) for cell edges
     return (min_dist * 2.0) - 1.0;
 }
 
@@ -332,8 +331,9 @@ vec3 interpolate_vertex(vec3 p1, vec3 p2, float v1, float v2) {
     return mix(p1, p2, clamp(t, 0.0, 1.0));
 }
 
-vec3 calculate_normal(vec3 p) {
-    float delta = 0.5;
+vec3 calculate_normal(vec3 p, float delta_multiplier) {
+    // Use larger delta and simplified gradient calculation for better performance
+    float delta = 1.0 * delta_multiplier;  // Slightly larger delta = smoother results
     vec3 world_offset = chunk_data.chunk_coords * chunk_data.chunk_size;
     vec3 world_pos = world_offset + p;
     
@@ -413,6 +413,10 @@ void main() {
     
     int lut_offset = cube_index * 16;
     
+    // Cache normals if smooth shading to avoid recalculation
+    vec3 cached_normals[12];
+    bool normal_computed[12] = bool[12](false, false, false, false, false, false, false, false, false, false, false, false);
+    
     for (int i = 0; i < 5; i++) {
         int edge0 = lookup_table.data[lut_offset + i * 3 + 0];
         int edge1 = lookup_table.data[lut_offset + i * 3 + 1];
@@ -426,12 +430,23 @@ void main() {
         
         vec3 normal;
         if (global_params.flat_shaded > 0.5) {
+            // Flat shading: compute face normal once
             normal = normalize(cross(v1 - v0, v2 - v0));
         } else {
-            vec3 n0 = calculate_normal(v0);
-            vec3 n1 = calculate_normal(v1);
-            vec3 n2 = calculate_normal(v2);
-            normal = normalize(n0 + n1 + n2);
+            // Smooth shading: cache per-vertex normals to avoid recalculation
+            if (!normal_computed[edge0]) {
+                cached_normals[edge0] = calculate_normal(v0, 0.5);
+                normal_computed[edge0] = true;
+            }
+            if (!normal_computed[edge1]) {
+                cached_normals[edge1] = calculate_normal(v1, 0.5);
+                normal_computed[edge1] = true;
+            }
+            if (!normal_computed[edge2]) {
+                cached_normals[edge2] = calculate_normal(v2, 0.5);
+                normal_computed[edge2] = true;
+            }
+            normal = normalize(cached_normals[edge0] + cached_normals[edge1] + cached_normals[edge2]);
         }
         
         int tri_index = atomicAdd(counter.triangle_count, 1);

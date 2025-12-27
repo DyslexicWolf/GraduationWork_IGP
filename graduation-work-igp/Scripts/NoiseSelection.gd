@@ -37,6 +37,12 @@ func _ready() -> void:
 	amount_of_noise_types = 3
 	ui_state = UI_State.UNDECIDED
 	
+	seed_entry_field.max_value = 10000
+	frequency_entry_field.max_value = 1
+	octaves_entry_field.max_value = 12
+	gain_entry_field.max_value = 1
+	lacunarity_entry_field.max_value = 5
+	cellular_jitter_entry_field.max_value = 1
 	update_ui()
 
 func update_ui() -> void:
@@ -45,7 +51,6 @@ func update_ui() -> void:
 			undecided_vbox_container.visible = true
 			preset_vbox_container.visible = false
 			custom_vbox_container.visible = false
-			
 		
 		UI_State.PRESET:
 			undecided_vbox_container.visible = false
@@ -63,19 +68,35 @@ func update_ui() -> void:
 func on_noise_type_prev_button_pressed() -> void:
 	current_custom_noise_type_index = (current_custom_noise_type_index - 1 + amount_of_noise_types) % amount_of_noise_types
 	NoiseConfig.noise_type = current_custom_noise_type_index
-	update_ui()
+	var noise_type_name: String
+	if current_custom_noise_type_index == 0:
+		noise_type_name = "Perlin"
+	elif current_custom_noise_type_index == 1:
+		noise_type_name = "Simplex"
+	else:
+		noise_type_name = "Cellular"
+	
+	noise_type_label.text = "NoiseType: " + noise_type_name
 
 func on_noise_type_next_button_pressed() -> void:
 	current_custom_noise_type_index = (current_custom_noise_type_index + 1) % amount_of_noise_types
 	NoiseConfig.noise_type = current_custom_noise_type_index
-	update_ui()
+	var noise_type_name: String
+	if current_custom_noise_type_index == 0:
+		noise_type_name = "Perlin"
+	elif current_custom_noise_type_index == 1:
+		noise_type_name = "Simplex"
+	else:
+		noise_type_name = "Cellular"
+	
+	noise_type_label.text = "NoiseType: " + noise_type_name
 
 func on_seed_changed(value: float) -> void:
 	NoiseConfig.noise_seed = int(value)
 
 ##still BIG issues with this random seed, doesnt work!!!
 func on_random_seed_pressed() -> void:
-	seed_entry_field.value = randi() % 100000
+	seed_entry_field.value = randi() % 10000
 
 func on_frequency_changed(value: float) -> void:
 	NoiseConfig.noise_frequency = value

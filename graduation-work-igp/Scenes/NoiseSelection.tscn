@@ -108,7 +108,6 @@ size_flags_vertical = 10
 text = "Back"
 
 [node name="Custom_VBoxContainer" type="VBoxContainer" parent="."]
-visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -128,7 +127,7 @@ layout_mode = 2
 
 [node name="NoiseTypeText" type="Label" parent="Custom_VBoxContainer/NoiseTypeContainer"]
 layout_mode = 2
-text = "Noisetype: Perlin"
+text = "NoiseType: Perlin"
 
 [node name="NoiseTypePrevButton" type="Button" parent="Custom_VBoxContainer/NoiseTypeContainer"]
 custom_minimum_size = Vector2(50, 0)
@@ -166,6 +165,7 @@ text = "Frequency:"
 
 [node name="FrequencyEntryField" type="SpinBox" parent="Custom_VBoxContainer/FrequencyContainer"]
 layout_mode = 2
+step = 0.01
 
 [node name="OctavesContainer" type="HBoxContainer" parent="Custom_VBoxContainer"]
 layout_mode = 2
@@ -186,6 +186,7 @@ text = "Gain: "
 
 [node name="GainEntryField" type="SpinBox" parent="Custom_VBoxContainer/GainContainer"]
 layout_mode = 2
+step = 0.1
 
 [node name="LacunarityContainer" type="HBoxContainer" parent="Custom_VBoxContainer"]
 layout_mode = 2
@@ -206,6 +207,7 @@ text = "Cellular jitter: "
 
 [node name="CellularJitterEntryField" type="SpinBox" parent="Custom_VBoxContainer/CellularJitterContainer"]
 layout_mode = 2
+step = 0.01
 
 [node name="StartGameButton" type="Button" parent="Custom_VBoxContainer"]
 custom_minimum_size = Vector2(125, 0)

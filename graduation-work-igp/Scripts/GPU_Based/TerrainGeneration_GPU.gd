@@ -28,6 +28,7 @@ var global_uniform_set: RID
 var rendered_chunks: Dictionary = {}
 var player: CharacterBody3D
 var chunk_load_queue: Array = []
+var chunk_index_counter: int = 0
 
 signal set_statistics(chunks_rendered: int, chunks_loaded_per_frame: int, render_distance: int, render_distance_height: int, chunk_size: int)
 signal set_chunks_rendered_text(chunks_rendered: int)
@@ -106,10 +107,10 @@ func _process(_delta):
 	for x in range(player_chunk_x - render_distance, player_chunk_x + render_distance + 1):
 		for y in range(player_chunk_y - render_distance_height, player_chunk_y + render_distance_height + 1):
 			for z in range(player_chunk_z - render_distance, player_chunk_z + render_distance + 1):
-				var chunk_key := str(x) + "," + str(y) + "," + str(z)
+				var chunk_key := Vector3i(x, y, z)
 				if not rendered_chunks.has(chunk_key):
-					var chunk_pos := Vector3(x, y, z)
-					var player_chunk_pos := Vector3(player_chunk_x, player_chunk_y, player_chunk_z)
+					var chunk_pos := Vector3i(x, y, z)
+					var player_chunk_pos := Vector3i(player_chunk_x, player_chunk_y, player_chunk_z)
 					var distance := chunk_pos.distance_to(player_chunk_pos)
 					chunk_load_queue.append({"key": chunk_key, "distance": distance, "pos": chunk_pos})
 	
@@ -118,10 +119,10 @@ func _process(_delta):
 	var chunks_this_frame = []
 	for i in range(min(chunks_to_load_per_frame, chunk_load_queue.size())):
 		var chunk_data = chunk_load_queue[i]
-		var x = int(chunk_data["pos"].x)
-		var y = int(chunk_data["pos"].y)
-		var z = int(chunk_data["pos"].z)
-		var chunk_key := str(x) + "," + str(y) + "," + str(z)
+		var chunk_key: Vector3i = chunk_data["key"]
+		var x = chunk_key.x
+		var y = chunk_key.y
+		var z = chunk_key.z
 		
 		var chunk_coords := Vector3(x, y, z)
 		var data_buffer_rid := create_data_buffer(chunk_coords)
@@ -143,11 +144,10 @@ func _process(_delta):
 		await process_chunk_batch(chunks_this_frame)
 	
 	#unload chunks if needed
-	for key in rendered_chunks.keys().duplicate():
-		var coords = key.split(",")
-		var chunk_x := int(coords[0])
-		var chunk_y := int(coords[1])
-		var chunk_z := int(coords[2])
+	for key: Vector3i in rendered_chunks.keys().duplicate():
+		var chunk_x := key.x
+		var chunk_y := key.y
+		var chunk_z := key.z
 		if abs(chunk_x - player_chunk_x) > render_distance or abs(chunk_y - player_chunk_y) > render_distance_height or abs(chunk_z - player_chunk_z) > render_distance:
 			unload_chunk(chunk_x, chunk_y, chunk_z)
 	set_chunks_rendered_text.emit(rendered_chunks.size())
@@ -160,10 +160,11 @@ func process_chunk_batch(chunks: Array):
 	
 	var compute_list := rd.compute_list_begin()
 	rd.compute_list_bind_compute_pipeline(compute_list, marching_cubes_pipeline)
+	var dispatch_size: int = chunk_size / 8
 	for chunk in chunks:
 		rd.compute_list_bind_uniform_set(compute_list, global_uniform_set, 0)
 		rd.compute_list_bind_uniform_set(compute_list, chunk["uniform_set"], 1)
-		rd.compute_list_dispatch(compute_list, chunk_size / 8, chunk_size / 8, chunk_size / 8)
+		rd.compute_list_dispatch(compute_list, dispatch_size, dispatch_size, dispatch_size)
 	rd.compute_list_end()
 	
 	rd.submit()
@@ -177,16 +178,18 @@ func process_chunk_batch(chunks: Array):
 			safe_free_rid(chunk["data_buffer"])
 			safe_free_rid(chunk["counter_buffer"])
 			safe_free_rid(chunk["vertices_buffer"])
-			print("Didn't load chunk: " + chunk["key"] + " because it is empty")
+			print("Didn't load chunk: " + str(chunk["key"]) + " because it is empty")
 			continue
 		
-		var output_array := rd.buffer_get_data(chunk["vertices_buffer"]).to_float32_array()
+		# Only read the portion of the buffer we actually filled
+		var bytes_needed = total_triangles * 4 * 4 * 4  # 4 vec4s per triangle, 4 bytes per float
+		var output_array := rd.buffer_get_data(chunk["vertices_buffer"], 0, bytes_needed).to_float32_array()
 		var chunk_mesh := build_mesh_from_compute_data(total_triangles, output_array)
 		
-		print("Loaded chunk: " + chunk["key"])
+		print("Loaded chunk: " + str(chunk["key"]))
 		var chunk_instance := MeshInstance3D.new()
 		chunk_instance.mesh = chunk_mesh
-		chunk_instance.position = Vector3(chunk["x"], chunk["y"], chunk["z"]) * chunk_size
+		chunk_instance.position = Vector3(chunk["x"], chunk["y"], chunk["z"]) * float(chunk_size)
 		
 		if chunk_mesh.get_surface_count() > 0:
 			chunk_instance.create_trimesh_collision()
@@ -287,7 +290,7 @@ func unload_chunk(x: int, y: int, z: int):
 		chunk_data["mesh_node"].queue_free()
 		
 		rendered_chunks.erase(chunk_key)
-		print("Unloaded chunk: " + chunk_key)
+		print("Unloaded chunk: " + str(chunk_key))
 
 func get_global_params():
 	var params := PackedFloat32Array()
