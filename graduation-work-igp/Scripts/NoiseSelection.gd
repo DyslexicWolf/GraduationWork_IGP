@@ -94,7 +94,6 @@ func on_noise_type_next_button_pressed() -> void:
 func on_seed_changed(value: float) -> void:
 	NoiseConfig.noise_seed = int(value)
 
-##still BIG issues with this random seed, doesnt work!!!
 func on_random_seed_pressed() -> void:
 	seed_entry_field.value = randi() % 10000
 

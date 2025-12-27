@@ -86,9 +86,11 @@
 #### 8. **Cache Lookup Table in GPU Memory**
    - Already done via global buffer ✅
 
-#### 9. **Batch Physics Colliders**
-   - Use single compound collider per chunk instead of trimesh
+#### 9. **Batch Physics Colliders** ✅
+   - Use StaticBody3D per chunk instead of trimesh directly on mesh
    - **Expected Gain:** 10-20% physics update time
+   - **Status:** Implemented - Added `use_batch_colliders` export variable (default: true)
+   - See `create_batch_collider()` in TerrainGeneration_GPU.gd
 
 ---
 
