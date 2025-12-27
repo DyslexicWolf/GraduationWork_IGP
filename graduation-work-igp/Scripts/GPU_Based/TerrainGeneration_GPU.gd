@@ -7,6 +7,9 @@ enum NoiseType {
 	CELLULAR = 2
 }
 
+var sync_time := 0.0
+var async_time := 0.0
+
 var rd = RenderingServer.create_local_rendering_device()
 var marching_cubes_pipeline: RID
 var marching_cubes_shader: RID
@@ -28,11 +31,16 @@ var global_uniform_set: RID
 @export_category("Physics Settings")
 @export var use_batch_colliders: bool = true
 
+@export_category("Performance Settings")
+@export var use_async_readback: bool = true
+
 var rendered_chunks: Dictionary = {}
 var player: CharacterBody3D
 var chunk_load_queue: Array = []
 var chunk_index_counter: int = 0
 var chunk_physics_bodies: Dictionary = {}  # Store StaticBody3D per chunk for batch colliders
+var pending_gpu_chunks: Array = []  # Queue of chunks waiting for GPU readback
+var frames_since_gpu_submit: int = 0  # Track frames to allow GPU time to complete
 
 signal set_statistics(chunks_rendered: int, chunks_loaded_per_frame: int, render_distance: int, render_distance_height: int, chunk_size: int)
 signal set_chunks_rendered_text(chunks_rendered: int)
@@ -147,6 +155,10 @@ func _process(_delta):
 	if chunks_this_frame.size() > 0:
 		await process_chunk_batch(chunks_this_frame)
 	
+	# Check if async readback results are ready
+	if use_async_readback:
+		await process_pending_gpu_chunks()
+	
 	#unload chunks if needed
 	for key: Vector3i in rendered_chunks.keys().duplicate():
 		var chunk_x := key.x
@@ -157,6 +169,7 @@ func _process(_delta):
 	set_chunks_rendered_text.emit(rendered_chunks.size())
 
 func process_chunk_batch(chunks: Array):
+	var start = Time.get_ticks_msec()
 	var zero_counter := PackedInt32Array([0])
 	var counter_bytes := zero_counter.to_byte_array()
 	for chunk in chunks:
@@ -173,8 +186,46 @@ func process_chunk_batch(chunks: Array):
 	
 	rd.submit()
 	await get_tree().process_frame
+	
+	if use_async_readback:
+		# Don't sync immediately - queue for later readback
+		# This allows GPU to process next batch while CPU handles previous results
+		pending_gpu_chunks.append_array(chunks)
+		frames_since_gpu_submit = 0
+		async_time = Time.get_ticks_msec() - start
+		print("Asynchronous chunk batch submitted in " + str(async_time) + " ms")
+	else:
+		# Synchronous readback (original behavior)
+		rd.sync()
+		await finalize_chunk_batch(chunks)
+		sync_time = Time.get_ticks_msec() - start
+		print("Synchronous chunk batch processed in " + str(sync_time) + " ms")
+
+func process_pending_gpu_chunks() -> void:
+	"""Check if pending GPU operations are complete and read back results.
+	
+	This enables pipelining: GPU works on frame N+1 while CPU processes results from frame N.
+	Expected gain: 20-30% frame rate improvement with multiple chunks.
+	"""
+	if pending_gpu_chunks.is_empty():
+		return
+	
+	frames_since_gpu_submit += 1
+	
+	# Wait at least 1-2 frames to give GPU time to complete
+	# Adjust based on your GPU (conservative: 2 frames, aggressive: 1 frame)
+	if frames_since_gpu_submit < 1:
+		return
+	
+	# Sync to ensure GPU is done
 	rd.sync()
 	
+	# Process all pending chunks
+	await finalize_chunk_batch(pending_gpu_chunks)
+	pending_gpu_chunks.clear()
+
+func finalize_chunk_batch(chunks: Array) -> void:
+	"""Read back GPU results and create mesh instances for completed chunks."""
 	for chunk in chunks:
 		var total_triangles := rd.buffer_get_data(chunk["counter_buffer"]).to_int32_array()[0]
 		
@@ -363,6 +414,16 @@ func _notification(type):
 		release()
 
 func release():
+	# Clean up pending GPU operations
+	if not pending_gpu_chunks.is_empty():
+		rd.sync()
+		for chunk in pending_gpu_chunks:
+			safe_free_rid(chunk["data_buffer"])
+			safe_free_rid(chunk["counter_buffer"])
+			safe_free_rid(chunk["vertices_buffer"])
+			safe_free_rid(chunk["uniform_set"])
+		pending_gpu_chunks.clear()
+	
 	safe_free_rid(global_uniform_set)
 	for buffers in global_buffers:
 		safe_free_rid(buffers)

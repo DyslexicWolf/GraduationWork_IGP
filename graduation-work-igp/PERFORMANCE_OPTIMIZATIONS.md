@@ -49,10 +49,13 @@
    4. Trade VRAM for computation speed
    ```
 
-#### 2. **Asynchronous GPU Readback** (GDScript)
+#### 2. **Asynchronous GPU Readback** (GDScript) ✅
    - **Problem:** `rd.sync()` blocks CPU waiting for GPU
    - **Solution:** Queue multiple chunks and read results later
    - **Expected Gain:** 20-30% frame rate improvement with multiple chunks
+   - **Status:** Implemented - Added `use_async_readback` export variable (default: true)
+   - **How it works:** GPU processes frame N+1 while CPU reads results from frame N (pipelining)
+   - See `process_chunk_batch()` and `process_pending_gpu_chunks()` in TerrainGeneration_GPU.gd
 
 #### 3. **LOD (Level of Detail) Chunks** (Both)
    - **Problem:** All chunks use same resolution (32³)

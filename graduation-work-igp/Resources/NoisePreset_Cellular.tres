@@ -7,5 +7,7 @@ script = ExtResource("1_4nk6l")
 preset_name = "Caves"
 noise_type = 2
 noise_frequency = 0.02
+fractal_octaves = 5
+fractal_gain = 0.4
 cellular_jitter = 1.0
 metadata/_custom_type_script = "uid://bn758jtp6ukb"
