@@ -38,9 +38,9 @@ var rendered_chunks: Dictionary = {}
 var player: CharacterBody3D
 var chunk_load_queue: Array = []
 var chunk_index_counter: int = 0
-var chunk_physics_bodies: Dictionary = {}  # Store StaticBody3D per chunk for batch colliders
-var pending_gpu_chunks: Array = []  # Queue of chunks waiting for GPU readback
-var frames_since_gpu_submit: int = 0  # Track frames to allow GPU time to complete
+var chunk_physics_bodies: Dictionary = {}
+var pending_gpu_chunks: Array = []
+var frames_since_gpu_submit: int = 0
 
 signal set_statistics(chunks_rendered: int, chunks_loaded_per_frame: int, render_distance: int, render_distance_height: int, chunk_size: int)
 signal set_chunks_rendered_text(chunks_rendered: int)
@@ -155,9 +155,8 @@ func _process(_delta):
 	if chunks_this_frame.size() > 0:
 		await process_chunk_batch(chunks_this_frame)
 	
-	# Check if async readback results are ready
 	if use_async_readback:
-		await process_pending_gpu_chunks()
+		process_pending_gpu_chunks()
 	
 	#unload chunks if needed
 	for key: Vector3i in rendered_chunks.keys().duplicate():
@@ -188,44 +187,31 @@ func process_chunk_batch(chunks: Array):
 	await get_tree().process_frame
 	
 	if use_async_readback:
-		# Don't sync immediately - queue for later readback
-		# This allows GPU to process next batch while CPU handles previous results
 		pending_gpu_chunks.append_array(chunks)
 		frames_since_gpu_submit = 0
 		async_time = Time.get_ticks_msec() - start
 		print("Asynchronous chunk batch submitted in " + str(async_time) + " ms")
 	else:
-		# Synchronous readback (original behavior)
 		rd.sync()
-		await finalize_chunk_batch(chunks)
+		finalize_chunk_batch(chunks)
 		sync_time = Time.get_ticks_msec() - start
 		print("Synchronous chunk batch processed in " + str(sync_time) + " ms")
 
 func process_pending_gpu_chunks() -> void:
-	"""Check if pending GPU operations are complete and read back results.
-	
-	This enables pipelining: GPU works on frame N+1 while CPU processes results from frame N.
-	Expected gain: 20-30% frame rate improvement with multiple chunks.
-	"""
 	if pending_gpu_chunks.is_empty():
 		return
 	
 	frames_since_gpu_submit += 1
 	
-	# Wait at least 1-2 frames to give GPU time to complete
-	# Adjust based on your GPU (conservative: 2 frames, aggressive: 1 frame)
 	if frames_since_gpu_submit < 1:
 		return
 	
-	# Sync to ensure GPU is done
 	rd.sync()
 	
-	# Process all pending chunks
-	await finalize_chunk_batch(pending_gpu_chunks)
+	finalize_chunk_batch(pending_gpu_chunks)
 	pending_gpu_chunks.clear()
 
 func finalize_chunk_batch(chunks: Array) -> void:
-	"""Read back GPU results and create mesh instances for completed chunks."""
 	for chunk in chunks:
 		var total_triangles := rd.buffer_get_data(chunk["counter_buffer"]).to_int32_array()[0]
 		
@@ -236,7 +222,6 @@ func finalize_chunk_batch(chunks: Array) -> void:
 			print("Didn't load chunk: " + str(chunk["key"]) + " because it is empty")
 			continue
 		
-		# Only read the portion of the buffer we actually filled
 		var bytes_needed = total_triangles * 4 * 4 * 4  # 4 vec4s per triangle, 4 bytes per float
 		var output_array := rd.buffer_get_data(chunk["vertices_buffer"], 0, bytes_needed).to_float32_array()
 		var chunk_mesh := build_mesh_from_compute_data(total_triangles, output_array)
@@ -347,7 +332,6 @@ func unload_chunk(x: int, y: int, z: int):
 		
 		chunk_data["mesh_node"].queue_free()
 		
-		# Clean up batch collider if it exists
 		if use_batch_colliders and chunk_physics_bodies.has(chunk_key):
 			chunk_physics_bodies[chunk_key].queue_free()
 			chunk_physics_bodies.erase(chunk_key)
@@ -384,14 +368,6 @@ func get_per_chunk_params(chunk_coords: Vector3):
 	return params
 
 func create_batch_collider(mesh_instance: MeshInstance3D, chunk_key: Vector3i) -> void:
-	"""Create a StaticBody3D with CollisionShape3D for batch physics optimization.
-	
-	Instead of creating trimesh collision directly on mesh instance,
-	we create a separate StaticBody3D. This allows better physics optimization
-	and easier management of collision shapes per chunk.
-	
-	Expected gain: 10-20% physics update time vs individual trimesh colliders.
-	"""
 	var static_body := StaticBody3D.new()
 	static_body.position = mesh_instance.position
 	
@@ -402,7 +378,6 @@ func create_batch_collider(mesh_instance: MeshInstance3D, chunk_key: Vector3i) -
 	static_body.add_child(collision_shape)
 	add_child(static_body)
 	
-	# Store reference for cleanup
 	chunk_physics_bodies[chunk_key] = static_body
 
 func safe_free_rid(rid: RID):
@@ -414,7 +389,6 @@ func _notification(type):
 		release()
 
 func release():
-	# Clean up pending GPU operations
 	if not pending_gpu_chunks.is_empty():
 		rd.sync()
 		for chunk in pending_gpu_chunks:
@@ -432,5 +406,5 @@ func release():
 	safe_free_rid(marching_cubes_pipeline)
 	safe_free_rid(marching_cubes_shader)
 	
-	# Only free it if you created a rendering device yourself
+	#only free if you made a rendering device yourself
 	rd.free()
