@@ -101,7 +101,6 @@ chunks_to_load_per_frame = 4
 flat_shaded = true
 render_distance = 6
 render_distance_height = 2
-use_async_readback = false
 
 [node name="Player" type="CharacterBody3D" parent="."]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 16, 16, 16)
