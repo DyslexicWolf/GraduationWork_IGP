@@ -41,7 +41,7 @@ var pending_mesh_tasks: Array = []
 var pending_collision_tasks: Array = []
 var task_mutex := Mutex.new()
 
-signal set_statistics(chunks_rendered: int, chunks_loaded_per_frame: int, render_distance: int, render_distance_height: int, chunk_size: int)
+signal set_statistics(chunks_rendered: int, chunks_loaded_per_frame: int, render_distance: int, render_distance_height: int, chunk_size: int, amount_of_worker_threads: int)
 signal set_chunks_rendered_text(chunks_rendered: int)
 signal set_fog_settings(render_distance: int)
 
@@ -56,7 +56,7 @@ func _ready():
 		return
 	
 	setup_global_bindings()
-	set_statistics.emit(0, chunks_to_load_per_frame, render_distance, render_distance_height, chunk_size)
+	set_statistics.emit(0, chunks_to_load_per_frame, render_distance, render_distance_height, chunk_size, amount_of_worker_threads)
 	set_fog_settings.emit(render_distance)
 
 func init_compute() -> bool:
