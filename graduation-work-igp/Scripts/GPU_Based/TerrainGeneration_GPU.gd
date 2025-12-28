@@ -7,9 +7,6 @@ enum NoiseType {
 	CELLULAR = 2
 }
 
-var sync_time := 0.0
-var async_time := 0.0
-
 var rd = RenderingServer.create_local_rendering_device()
 var marching_cubes_pipeline: RID
 var marching_cubes_shader: RID
@@ -28,12 +25,7 @@ var global_uniform_set: RID
 @export var render_distance: int
 @export var render_distance_height: int
 
-@export_category("Physics Settings")
-@export var use_batch_colliders: bool = true
-
-@export_category("Performance Settings")
-@export var use_async_readback: bool = true
-@export var use_threaded_mesh_finalization: bool = true
+@export_category("CPU Settings")
 @export var amount_of_worker_threads: int = 2
 
 var rendered_chunks: Dictionary = {}
@@ -44,7 +36,6 @@ var chunk_physics_bodies: Dictionary = {}
 var pending_gpu_chunks: Array = []
 var frames_since_gpu_submit: int = 0
 
-# Threading variables
 var mesh_finalization_thread_pool: Array[Thread] = []
 var pending_mesh_tasks: Array = []
 var pending_collision_tasks: Array = []
@@ -57,10 +48,8 @@ signal set_fog_settings(render_distance: int)
 func _ready():
 	player = $"../Player"
 	
-	# Initialize thread pool for mesh finalization
-	if use_threaded_mesh_finalization:
-		for i in range(amount_of_worker_threads):
-			mesh_finalization_thread_pool.append(null)
+	for i in range(amount_of_worker_threads):
+		mesh_finalization_thread_pool.append(null)
 	
 	if not init_compute():
 		push_error("Failed to initialize compute shader!")
@@ -168,13 +157,8 @@ func _process(_delta):
 	if chunks_this_frame.size() > 0:
 		await process_chunk_batch(chunks_this_frame)
 	
-	if use_async_readback:
-		if use_threaded_mesh_finalization:
-			process_threaded_mesh_finalization()
-		else:
-			process_pending_gpu_chunks()
+	process_threaded_mesh_finalization()
 	
-	# Process pending collisions
 	process_pending_collisions()
 	
 	#unload chunks if needed
@@ -187,7 +171,6 @@ func _process(_delta):
 	set_chunks_rendered_text.emit(rendered_chunks.size())
 
 func process_chunk_batch(chunks: Array):
-	var start = Time.get_ticks_msec()
 	var zero_counter := PackedInt32Array([0])
 	var counter_bytes := zero_counter.to_byte_array()
 	for chunk in chunks:
@@ -205,51 +188,33 @@ func process_chunk_batch(chunks: Array):
 	rd.submit()
 	await get_tree().process_frame
 	
-	if use_async_readback:
-		if use_threaded_mesh_finalization:
-			# Queue chunks for threaded finalization instead of immediate processing
-			task_mutex.lock()
-			pending_mesh_tasks.append_array(chunks)
-			task_mutex.unlock()
-			frames_since_gpu_submit = 0
-			async_time = Time.get_ticks_msec() - start
-			print("Asynchronous chunk batch queued for threaded finalization in " + str(async_time) + " ms")
-		else:
-			pending_gpu_chunks.append_array(chunks)
-			frames_since_gpu_submit = 0
-			async_time = Time.get_ticks_msec() - start
-			print("Asynchronous chunk batch submitted in " + str(async_time) + " ms")
-	else:
-		rd.sync()
-		finalize_chunk_batch(chunks)
-		sync_time = Time.get_ticks_msec() - start
-		print("Synchronous chunk batch processed in " + str(sync_time) + " ms")
+	task_mutex.lock()
+	pending_mesh_tasks.append_array(chunks)
+	task_mutex.unlock()
+	frames_since_gpu_submit = 0
 
 func process_threaded_mesh_finalization() -> void:
-	"""Process mesh finalization using a thread pool"""
 	if pending_mesh_tasks.is_empty():
 		return
 	
-	# Check if we have chunks that need GPU data read
+	#check if the chunks have gpu data already or not
 	var has_unread_chunks = false
 	for chunk in pending_mesh_tasks:
 		if not (chunk.has("gpu_data_read") and chunk["gpu_data_read"]):
 			has_unread_chunks = true
 			break
 	
-	# Only sync if we have unread GPU data
+	#sync if it doesn't have the gpu data yet
 	if has_unread_chunks:
 		rd.sync()
 	
-	# Read GPU buffers on main thread and queue for mesh building
 	for i in range(pending_mesh_tasks.size()):
 		var chunk = pending_mesh_tasks[i]
 		
-		# Skip if already has GPU data read
+		#skip if the chunk has the gpu data already
 		if chunk.has("gpu_data_read") and chunk["gpu_data_read"]:
 			continue
 		
-		# Read triangle count from GPU (render thread only)
 		var total_triangles := rd.buffer_get_data(chunk["counter_buffer"]).to_int32_array()[0]
 		
 		if total_triangles == 0:
@@ -257,7 +222,6 @@ func process_threaded_mesh_finalization() -> void:
 			chunk["gpu_data_read"] = true
 			continue
 		
-		# Read vertex data from GPU (render thread only)
 		var bytes_needed = total_triangles * 4 * 4 * 4
 		var output_array := rd.buffer_get_data(chunk["vertices_buffer"], 0, bytes_needed).to_float32_array()
 		
@@ -265,17 +229,17 @@ func process_threaded_mesh_finalization() -> void:
 		chunk["vertex_data"] = output_array
 		chunk["gpu_data_read"] = true
 	
-	# Submit tasks to available threads for mesh building
 	for i in range(pending_mesh_tasks.size()):
 		var chunk = pending_mesh_tasks[i]
 		
 		if not chunk.get("gpu_data_read", false):
-			continue  # GPU data not ready yet
+			continue
 		
+		#check if the chunk is already processing on a worker thread or not
 		if chunk.has("thread") and chunk["thread"] != null:
-			continue  # Already processing
+			continue
 		
-		# Find available thread
+		#find an available thread
 		var thread_idx = find_available_mesh_thread()
 		if thread_idx >= 0:
 			var callable = Callable(self, "build_mesh_threaded").bind(
@@ -288,40 +252,35 @@ func process_threaded_mesh_finalization() -> void:
 			thread.start(callable)
 			mesh_finalization_thread_pool[thread_idx] = chunk["thread"]
 	
-	# Collect completed tasks
+	#collect the meshes from worker threads that are done
 	var completed_indices = []
 	for i in range(pending_mesh_tasks.size()):
 		var chunk = pending_mesh_tasks[i]
 		
 		if chunk.has("thread") and chunk["thread"] != null:
 			if not chunk["thread"].is_alive():
-				# Thread finished, get result
 				var mesh_result = chunk["thread"].wait_to_finish()
 				chunk["thread"] = null
 				
-				# Apply the finalized mesh on main thread
 				if mesh_result != null:
-					apply_finalized_mesh_with_mesh(chunk, mesh_result)
+					apply_finalized_mesh(chunk, mesh_result)
 				
 				completed_indices.append(i)
 	
-	# Remove completed tasks in reverse order to maintain indices
+	#remove completed tasks in reverse order to maintain indices
 	for i in range(completed_indices.size() - 1, -1, -1):
 		pending_mesh_tasks.remove_at(completed_indices[i])
 
 func find_available_mesh_thread() -> int:
-	"""Find an available thread slot in the pool"""
 	for i in range(mesh_finalization_thread_pool.size()):
 		if mesh_finalization_thread_pool[i] == null or not mesh_finalization_thread_pool[i].is_alive():
 			return i
 	return -1
 
 func build_mesh_threaded(total_triangles: int, output_array: PackedFloat32Array, _chunk_key: Vector3i) -> Dictionary:
-	"""Runs on worker thread - builds mesh from vertex data"""
 	if total_triangles == 0:
 		return {}
 	
-	# Build mesh data structure on thread (safe operation)
 	var output = {
 		"vertices": PackedVector3Array(),
 		"normals": PackedVector3Array(),
@@ -336,14 +295,12 @@ func build_mesh_threaded(total_triangles: int, output_array: PackedFloat32Array,
 		for j in range(3):
 			output["normals"].push_back(normal)
 	
-	# Store processed data (mesh creation happens on main thread)
 	return {
 		"vertices": output["vertices"],
 		"normals": output["normals"]
 	}
 
-func apply_finalized_mesh_with_mesh(chunk: Dictionary, mesh_data: Dictionary) -> void:
-	"""Apply mesh built on worker thread to scene"""
+func apply_finalized_mesh(chunk: Dictionary, mesh_data: Dictionary) -> void:
 	var total_triangles = chunk.get("total_triangles", 0)
 	
 	if total_triangles == 0:
@@ -353,7 +310,6 @@ func apply_finalized_mesh_with_mesh(chunk: Dictionary, mesh_data: Dictionary) ->
 		print("Didn't load chunk: " + str(chunk["key"]) + " because it is empty")
 		return
 	
-	# Build the actual mesh on main thread
 	var chunk_mesh := build_mesh_from_thread_data(mesh_data)
 	
 	print("Loaded chunk: " + str(chunk["key"]))
@@ -362,10 +318,7 @@ func apply_finalized_mesh_with_mesh(chunk: Dictionary, mesh_data: Dictionary) ->
 	chunk_instance.position = Vector3(chunk["x"], chunk["y"], chunk["z"]) * float(chunk_size)
 	
 	if chunk_mesh.get_surface_count() > 0:
-		if use_batch_colliders:
-			queue_collision_creation(chunk_instance, chunk["key"])
-		else:
-			chunk_instance.create_trimesh_collision()
+		queue_collision_creation(chunk_instance, chunk["key"])
 	
 	add_child(chunk_instance)
 	
@@ -378,7 +331,6 @@ func apply_finalized_mesh_with_mesh(chunk: Dictionary, mesh_data: Dictionary) ->
 	}
 
 func build_mesh_from_thread_data(mesh_data: Dictionary) -> Mesh:
-	"""Create ArrayMesh from thread-processed data on main thread"""
 	var vertices = mesh_data.get("vertices", PackedVector3Array())
 	var normals = mesh_data.get("normals", PackedVector3Array())
 	
@@ -390,121 +342,6 @@ func build_mesh_from_thread_data(mesh_data: Dictionary) -> Mesh:
 	var array_mesh := ArrayMesh.new()
 	array_mesh.clear_surfaces()
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, array_mesh_data)
-	array_mesh.surface_set_material(0, terrain_material)
-	
-	return array_mesh
-
-func apply_finalized_mesh(task: Dictionary) -> void:
-	"""Apply finalized mesh on main thread"""
-	var chunk = task
-	var mesh_data = chunk.get("mesh_data", {})
-	var total_triangles = mesh_data.get("total_triangles", 0)
-	
-	if total_triangles == 0:
-		if rendered_chunks.has(chunk["key"]):
-			safe_free_rid(chunk["data_buffer"])
-			safe_free_rid(chunk["counter_buffer"])
-			safe_free_rid(chunk["vertices_buffer"])
-			print("Didn't load chunk: " + str(chunk["key"]) + " because it is empty")
-		return
-	
-	var output_array = mesh_data.get("vertices", PackedFloat32Array())
-	var chunk_mesh := build_mesh_from_compute_data(total_triangles, output_array)
-	
-	print("Loaded chunk: " + str(chunk["key"]))
-	var chunk_instance := MeshInstance3D.new()
-	chunk_instance.mesh = chunk_mesh
-	chunk_instance.position = Vector3(chunk["x"], chunk["y"], chunk["z"]) * float(chunk_size)
-	
-	if chunk_mesh.get_surface_count() > 0:
-		if use_batch_colliders:
-			# Queue collision creation asynchronously
-			queue_collision_creation(chunk_instance, chunk["key"])
-		else:
-			chunk_instance.create_trimesh_collision()
-	
-	add_child(chunk_instance)
-	
-	rendered_chunks[chunk["key"]] = {
-		"mesh_node": chunk_instance,
-		"data_buffer": chunk["data_buffer"],
-		"counter_buffer": chunk["counter_buffer"],
-		"vertices_buffer": chunk["vertices_buffer"],
-		"per_chunk_uniform_set": chunk["uniform_set"]
-	}
-
-func process_pending_gpu_chunks() -> void:
-	if pending_gpu_chunks.is_empty():
-		return
-	
-	frames_since_gpu_submit += 1
-	
-	if frames_since_gpu_submit < 1:
-		return
-	
-	rd.sync()
-	
-	finalize_chunk_batch(pending_gpu_chunks)
-	pending_gpu_chunks.clear()
-
-func finalize_chunk_batch(chunks: Array) -> void:
-	for chunk in chunks:
-		var total_triangles := rd.buffer_get_data(chunk["counter_buffer"]).to_int32_array()[0]
-		
-		if total_triangles == 0:
-			safe_free_rid(chunk["data_buffer"])
-			safe_free_rid(chunk["counter_buffer"])
-			safe_free_rid(chunk["vertices_buffer"])
-			print("Didn't load chunk: " + str(chunk["key"]) + " because it is empty")
-			continue
-		
-		var bytes_needed = total_triangles * 4 * 4 * 4  # 4 vec4s per triangle, 4 bytes per float
-		var output_array := rd.buffer_get_data(chunk["vertices_buffer"], 0, bytes_needed).to_float32_array()
-		var chunk_mesh := build_mesh_from_compute_data(total_triangles, output_array)
-		
-		print("Loaded chunk: " + str(chunk["key"]))
-		var chunk_instance := MeshInstance3D.new()
-		chunk_instance.mesh = chunk_mesh
-		chunk_instance.position = Vector3(chunk["x"], chunk["y"], chunk["z"]) * float(chunk_size)
-		
-		if chunk_mesh.get_surface_count() > 0:
-			if use_batch_colliders:
-				create_batch_collider(chunk_instance, chunk["key"])
-			else:
-				chunk_instance.create_trimesh_collision()
-		add_child(chunk_instance)
-		
-		rendered_chunks[chunk["key"]] = {
-			"mesh_node": chunk_instance,
-			"data_buffer": chunk["data_buffer"],
-			"counter_buffer": chunk["counter_buffer"],
-			"vertices_buffer": chunk["vertices_buffer"],
-			"per_chunk_uniform_set": chunk["uniform_set"]
-		}
-
-func build_mesh_from_compute_data(total_triangles: int, output_array: PackedFloat32Array) -> Mesh:
-	var output = {
-		"vertices": PackedVector3Array(),
-		"normals": PackedVector3Array(),
-	}
-	
-	for i in range(0, total_triangles * 16, 16):
-		output["vertices"].push_back(Vector3(output_array[i + 0], output_array[i + 1], output_array[i + 2]))
-		output["vertices"].push_back(Vector3(output_array[i + 4], output_array[i + 5], output_array[i + 6]))
-		output["vertices"].push_back(Vector3(output_array[i + 8], output_array[i + 9], output_array[i + 10]))
-		
-		var normal := Vector3(output_array[i + 12], output_array[i + 13], output_array[i + 14])
-		for j in range(3):
-			output["normals"].push_back(normal)
-	
-	var mesh_data := []
-	mesh_data.resize(Mesh.ARRAY_MAX)
-	mesh_data[Mesh.ARRAY_VERTEX] = output["vertices"]
-	mesh_data[Mesh.ARRAY_NORMAL] = output["normals"]
-	
-	var array_mesh := ArrayMesh.new()
-	array_mesh.clear_surfaces()
-	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data)
 	array_mesh.surface_set_material(0, terrain_material)
 	
 	return array_mesh
@@ -568,7 +405,7 @@ func unload_chunk(x: int, y: int, z: int):
 		
 		chunk_data["mesh_node"].queue_free()
 		
-		if use_batch_colliders and chunk_physics_bodies.has(chunk_key):
+		if chunk_physics_bodies.has(chunk_key):
 			chunk_physics_bodies[chunk_key].queue_free()
 			chunk_physics_bodies.erase(chunk_key)
 		
@@ -604,18 +441,12 @@ func get_per_chunk_params(chunk_coords: Vector3):
 	return params
 
 func queue_collision_creation(mesh_instance: MeshInstance3D, chunk_key: Vector3i) -> void:
-	"""Queue collision creation without blocking"""
-	task_mutex.lock()
 	pending_collision_tasks.append({
 		"mesh_instance": mesh_instance,
-		"chunk_key": chunk_key,
-		"thread": null,
-		"completed": false
+		"chunk_key": chunk_key
 	})
-	task_mutex.unlock()
 
 func process_pending_collisions() -> void:
-	"""Process collision creation for completed tasks"""
 	if pending_collision_tasks.is_empty():
 		return
 	
@@ -624,35 +455,13 @@ func process_pending_collisions() -> void:
 	for i in range(pending_collision_tasks.size()):
 		var task = pending_collision_tasks[i]
 		
-		# If thread hasn't been started yet, start it
-		if task["thread"] == null and not task["completed"]:
-			var callable = Callable(self, "create_collision_shape_threaded").bind(
-				task["mesh_instance"].mesh,
-				task["chunk_key"]
-			)
-			var thread = Thread.new()
-			task["thread"] = thread
-			thread.start(callable)
+		if is_instance_valid(task["mesh_instance"]):
+			create_batch_collider(task["mesh_instance"], task["chunk_key"])
 		
-		# Check if thread is done
-		if task["thread"] != null and not task["thread"].is_alive():
-			if not task["completed"]:
-				task["thread"].wait_to_finish()  # Ensure thread completes
-				# Validate mesh_instance is still valid before using
-				if is_instance_valid(task["mesh_instance"]):
-					create_batch_collider(task["mesh_instance"], task["chunk_key"])
-				task["completed"] = true
-				completed_indices.append(i)
+		completed_indices.append(i)
 	
-	# Remove completed tasks
 	for i in range(completed_indices.size() - 1, -1, -1):
 		pending_collision_tasks.remove_at(completed_indices[i])
-
-func create_collision_shape_threaded(_mesh: Mesh, _chunk_key: Vector3i) -> bool:
-	"""Prepare collision data on worker thread"""
-	# This function runs on a worker thread and prepares the collision shape
-	# The actual collision application happens on the main thread
-	return true
 
 func create_batch_collider(mesh_instance: MeshInstance3D, chunk_key: Vector3i) -> void:
 	var static_body := StaticBody3D.new()
@@ -676,24 +485,22 @@ func _notification(type):
 		release()
 
 func release():
-	# Clean up mesh finalization threads and their RIDs
 	for task in pending_mesh_tasks:
 		if task.has("thread") and task["thread"] != null and task["thread"].is_alive():
 			task["thread"].wait_to_finish()
-		# Free GPU buffers from pending tasks
 		safe_free_rid(task.get("data_buffer", RID()))
 		safe_free_rid(task.get("counter_buffer", RID()))
 		safe_free_rid(task.get("vertices_buffer", RID()))
 		safe_free_rid(task.get("uniform_set", RID()))
 	pending_mesh_tasks.clear()
 	
-	# Clean up collision threads
+	#clean up collision threads
 	for task in pending_collision_tasks:
 		if task.has("thread") and task["thread"] != null and task["thread"].is_alive():
 			task["thread"].wait_to_finish()
 	pending_collision_tasks.clear()
 	
-	# Clean up thread pool
+	#clean up threadpool
 	for thread in mesh_finalization_thread_pool:
 		if thread != null and thread.is_alive():
 			thread.wait_to_finish()
