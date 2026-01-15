@@ -1,6 +1,7 @@
 extends Control
 
 var fps_label: RichTextLabel
+var time_label: RichTextLabel
 var chunks_rendered_label: RichTextLabel
 var chunks_loaded_per_frame_label: RichTextLabel
 var render_distance_label: RichTextLabel
@@ -10,6 +11,7 @@ var worker_threads_label: RichTextLabel
 
 func _ready() -> void:
 	fps_label = $VBoxContainer/FPS_Text
+	time_label = $VBoxContainer/Time_Text
 	chunks_rendered_label = $VBoxContainer/ChunksRendered_Text
 	chunks_loaded_per_frame_label = $VBoxContainer/ChunksLoadedPerFrame_Text
 	render_distance_label = $VBoxContainer/RenderDistance_Text
@@ -19,6 +21,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	fps_label.text = "[color=lightgreen]" + str(Engine.get_frames_per_second()) + "[/color] FPS"
+	time_label.text = "[color=lightgreen]" + str(Time.get_ticks_msec() / 1000) + "[/color] seconds passed"
 
 func set_initial_statistics_text(chunks_rendered: int, chunks_loaded_per_frame: int, render_distance: int, render_distance_height: int, chunk_size: int, amount_of_worker_threads: int):
 	chunks_rendered_label.text = "[color=lightgreen]" + str(chunks_rendered) + "[/color] chunks rendered"
