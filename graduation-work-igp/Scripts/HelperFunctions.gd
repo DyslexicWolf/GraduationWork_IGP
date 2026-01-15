@@ -2,24 +2,19 @@ extends Node
 class_name HelperFunctions
 
 static func march_cube(x:int, y:int, z:int, voxel_grid:VoxelGrid, vertices:PackedVector3Array):
-  # Get the correct configuration
 	var tri = get_triangulation(x, y, z, voxel_grid)
 	for edge_index in tri:
 		if edge_index < 0: break
 		var point_indices = GlobalConstants.EDGES[edge_index]
 		
-		# Get 2 points connecting this edge
 		var p0 = GlobalConstants.POINTS[point_indices.x]
 		var p1 = GlobalConstants.POINTS[point_indices.y]
 		
-		# Global position of these 2 points
 		var pos_a = Vector3(x+p0.x, y+p0.y, z+p0.z)
 		var pos_b = Vector3(x+p1.x, y+p1.y, z+p1.z)
 		
-		# Interpolate between these 2 points to get our mesh's vertex position
 		var position = calculate_interpolation(pos_a, pos_b, voxel_grid)
 		
-		# Add our new vertex to our mesh's vertices array
 		vertices.append(position)
 
 #idx is a byte, we check for each vertex whether it is in the surface or not
@@ -37,7 +32,7 @@ static func get_triangulation(x:int, y:int, z:int, voxel_grid:VoxelGrid):
 	idx |= int(voxel_grid.read(x+1, y+1, z) < voxel_grid.iso_level)<<7
 	return GlobalConstants.LOOKUPTABLE[idx]
 
-# Interpolate between the two vertices to place our new vertex in between
+#interpolate between the two vertices to place our new vertex in between
 static func calculate_interpolation(a:Vector3, b:Vector3, voxel_grid:VoxelGrid):
 	var val_a = voxel_grid.read(a.x, a.y, a.z)
 	var val_b = voxel_grid.read(b.x, b.y, b.z)

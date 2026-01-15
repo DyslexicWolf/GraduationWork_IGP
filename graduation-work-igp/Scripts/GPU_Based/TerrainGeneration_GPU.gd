@@ -31,10 +31,7 @@ var global_uniform_set: RID
 var rendered_chunks: Dictionary = {}
 var player: CharacterBody3D
 var chunk_load_queue: Array = []
-var chunk_index_counter: int = 0
 var chunk_physics_bodies: Dictionary = {}
-var pending_gpu_chunks: Array = []
-var frames_since_gpu_submit: int = 0
 
 var mesh_finalization_thread_pool: Array[Thread] = []
 var pending_mesh_tasks: Array = []
@@ -123,10 +120,9 @@ func _process(_delta):
 			for z in range(player_chunk_z - render_distance, player_chunk_z + render_distance + 1):
 				var chunk_key := Vector3i(x, y, z)
 				if not rendered_chunks.has(chunk_key):
-					var chunk_pos := Vector3i(x, y, z)
 					var player_chunk_pos := Vector3i(player_chunk_x, player_chunk_y, player_chunk_z)
-					var distance := chunk_pos.distance_to(player_chunk_pos)
-					chunk_load_queue.append({"key": chunk_key, "distance": distance, "pos": chunk_pos})
+					var distance := chunk_key.distance_to(player_chunk_pos)
+					chunk_load_queue.append({"key": chunk_key, "distance": distance})
 	
 	chunk_load_queue.sort_custom(func(a, b): return a["distance"] < b["distance"])
 	
@@ -134,11 +130,7 @@ func _process(_delta):
 	for i in range(min(chunks_to_load_per_frame, chunk_load_queue.size())):
 		var chunk_data = chunk_load_queue[i]
 		var chunk_key: Vector3i = chunk_data["key"]
-		var x = chunk_key.x
-		var y = chunk_key.y
-		var z = chunk_key.z
-		
-		var chunk_coords := Vector3(x, y, z)
+		var chunk_coords := Vector3(chunk_key)
 		var data_buffer_rid := create_data_buffer(chunk_coords)
 		var counter_buffer_rid := create_counter_buffer()
 		var vertices_buffer_rid := create_vertices_buffer()
@@ -147,7 +139,7 @@ func _process(_delta):
 		rendered_chunks[chunk_key] = null
 		chunks_this_frame.append({
 			"key": chunk_key,
-			"x": x, "y": y, "z": z,
+			"x": chunk_key.x, "y": chunk_key.y, "z": chunk_key.z,
 			"data_buffer": data_buffer_rid,
 			"counter_buffer": counter_buffer_rid,
 			"vertices_buffer": vertices_buffer_rid,
@@ -191,7 +183,6 @@ func process_chunk_batch(chunks: Array):
 	task_mutex.lock()
 	pending_mesh_tasks.append_array(chunks)
 	task_mutex.unlock()
-	frames_since_gpu_submit = 0
 
 func process_threaded_mesh_finalization() -> void:
 	if pending_mesh_tasks.is_empty():
@@ -252,9 +243,8 @@ func process_threaded_mesh_finalization() -> void:
 			thread.start(callable)
 			mesh_finalization_thread_pool[thread_idx] = chunk["thread"]
 	
-	#collect the meshes from worker threads that are done
-	var completed_indices = []
-	for i in range(pending_mesh_tasks.size()):
+	#collect and remove completed mesh tasks from worker threads
+	for i in range(pending_mesh_tasks.size() - 1, -1, -1):
 		var chunk = pending_mesh_tasks[i]
 		
 		if chunk.has("thread") and chunk["thread"] != null:
@@ -265,11 +255,7 @@ func process_threaded_mesh_finalization() -> void:
 				if mesh_result != null:
 					apply_finalized_mesh(chunk, mesh_result)
 				
-				completed_indices.append(i)
-	
-	#remove completed tasks in reverse order to maintain indices
-	for i in range(completed_indices.size() - 1, -1, -1):
-		pending_mesh_tasks.remove_at(completed_indices[i])
+				pending_mesh_tasks.remove_at(i)
 
 func find_available_mesh_thread() -> int:
 	for i in range(mesh_finalization_thread_pool.size()):
@@ -450,18 +436,13 @@ func process_pending_collisions() -> void:
 	if pending_collision_tasks.is_empty():
 		return
 	
-	var completed_indices = []
-	
-	for i in range(pending_collision_tasks.size()):
+	for i in range(pending_collision_tasks.size() - 1, -1, -1):
 		var task = pending_collision_tasks[i]
 		
 		if is_instance_valid(task["mesh_instance"]):
 			create_batch_collider(task["mesh_instance"], task["chunk_key"])
 		
-		completed_indices.append(i)
-	
-	for i in range(completed_indices.size() - 1, -1, -1):
-		pending_collision_tasks.remove_at(completed_indices[i])
+		pending_collision_tasks.remove_at(i)
 
 func create_batch_collider(mesh_instance: MeshInstance3D, chunk_key: Vector3i) -> void:
 	var static_body := StaticBody3D.new()
@@ -505,15 +486,6 @@ func release():
 		if thread != null and thread.is_alive():
 			thread.wait_to_finish()
 	mesh_finalization_thread_pool.clear()
-	
-	if not pending_gpu_chunks.is_empty():
-		rd.sync()
-		for chunk in pending_gpu_chunks:
-			safe_free_rid(chunk["data_buffer"])
-			safe_free_rid(chunk["counter_buffer"])
-			safe_free_rid(chunk["vertices_buffer"])
-			safe_free_rid(chunk["uniform_set"])
-		pending_gpu_chunks.clear()
 	
 	safe_free_rid(global_uniform_set)
 	for buffers in global_buffers:
