@@ -9,9 +9,9 @@ layout(set = 0, binding = 0, std430) restrict readonly buffer GlobalParams {
     float fractal_octaves;
     float terrain_terrace;
     int noise_type;  // 0=Perlin, 1=Simplex, 2=Cellular
-    float noise_gain; // Amplitude multiplier for octaves
-    float noise_lacunarity; // Frequency multiplier for octaves
-    float cellular_jitter; // For cellular noise
+    float noise_gain;
+    float noise_lacunarity;
+    float cellular_jitter;
 } global_params;
 
 layout(set = 0, binding = 1, std430) restrict readonly buffer LookupTable {
@@ -33,11 +33,7 @@ layout(set = 1, binding = 2, std430) restrict buffer Vertices {
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
-// ============================================================================
-// HASH AND UTILITY FUNCTIONS
-// ============================================================================
 
-// Permutation table for Perlin noise
 const int PERM[256] = int[256](
     151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225,
     140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23, 190, 6, 148,
@@ -61,21 +57,15 @@ int hash(int x) {
     return PERM[x & 255];
 }
 
-// Hash function for simplex and cellular noise
 vec3 hash3(vec3 p) {
     p = fract(p * vec3(0.1031, 0.1030, 0.0973));
     p += dot(p, p.yxz + 33.33);
     return fract((p.xxy + p.yxx) * p.zyx);
 }
 
-// Fade function for smooth interpolation
 float fade(float t) {
     return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
 }
-
-// ============================================================================
-// PERLIN NOISE
-// ============================================================================
 
 vec3 grad3_perlin(int hash_val) {
     int h = hash_val & 15;
@@ -124,10 +114,6 @@ float perlin_noise(vec3 p) {
     return mix(y0, y1, u.z);
 }
 
-// ============================================================================
-// SIMPLEX NOISE (OpenSimplex2-style)
-// ============================================================================
-
 vec3 mod289_vec3(vec3 x) {
     return x - floor(x * (1.0 / 289.0)) * 289.0;
 }
@@ -148,11 +134,9 @@ float simplex_noise(vec3 v) {
     const vec2 C = vec2(1.0/6.0, 1.0/3.0);
     const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
     
-    // First corner
     vec3 i  = floor(v + dot(v, C.yyy));
     vec3 x0 = v - i + dot(i, C.xxx);
     
-    // Other corners
     vec3 g = step(x0.yzx, x0.xyz);
     vec3 l = 1.0 - g;
     vec3 i1 = min(g.xyz, l.zxy);
@@ -162,15 +146,13 @@ float simplex_noise(vec3 v) {
     vec3 x2 = x0 - i2 + C.yyy;
     vec3 x3 = x0 - D.yyy;
     
-    // Permutations
     i = mod289_vec3(i);
     vec4 p = permute(permute(permute(
              i.z + vec4(0.0, i1.z, i2.z, 1.0))
            + i.y + vec4(0.0, i1.y, i2.y, 1.0))
            + i.x + vec4(0.0, i1.x, i2.x, 1.0));
     
-    // Gradients
-    float n_ = 0.142857142857; // 1.0/7.0
+    float n_ = 0.142857142857;
     vec3 ns = n_ * D.wyz - D.xzx;
     
     vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
@@ -197,22 +179,16 @@ float simplex_noise(vec3 v) {
     vec3 p2 = vec3(a1.xy, h.z);
     vec3 p3 = vec3(a1.zw, h.w);
     
-    // Normalize gradients
     vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
     p0 *= norm.x;
     p1 *= norm.y;
     p2 *= norm.z;
     p3 *= norm.w;
     
-    // Mix final noise value
     vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
     m = m * m;
     return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
 }
-
-// ============================================================================
-// CELLULAR NOISE (WORLEY/VORONOI)
-// ============================================================================
 
 float cellular_noise(vec3 p) {
     vec3 pi = floor(p);
@@ -221,24 +197,19 @@ float cellular_noise(vec3 p) {
     float min_dist = 10.0;
     float second_min_dist = 10.0;
     
-    // Reduced iteration: only check 2x2x2 = 8 neighbors instead of 3x3x3 = 27 (71% faster)
     for (int z = -1; z <= 1; z++) {
         for (int y = -1; y <= 1; y++) {
             for (int x = -1; x <= 1; x++) {
                 vec3 neighbor = vec3(float(x), float(y), float(z));
                 vec3 cell = pi + neighbor;
                 
-                // Get random point within this cell
                 vec3 point = hash3(cell);
                 
-                // Apply jitter (0 = grid, 1 = fully random)
                 point = neighbor + mix(vec3(0.5), point, global_params.cellular_jitter);
                 
-                // Calculate distance to this feature point
                 vec3 diff = point - pf;
                 float dist = length(diff);
                 
-                // Track two closest distances
                 if (dist < min_dist) {
                     second_min_dist = min_dist;
                     min_dist = dist;
@@ -249,13 +220,9 @@ float cellular_noise(vec3 p) {
         }
     }
     
-    // Return F1 (closest distance) normalized to roughly [-1, 1] range
     return (min_dist * 2.0) - 1.0;
 }
 
-// ============================================================================
-// FRACTAL BROWNIAN MOTION (FBM)
-// ============================================================================
 
 float fbm(vec3 p, int octaves, int noise_type) {
     float value = 0.0;
@@ -266,15 +233,11 @@ float fbm(vec3 p, int octaves, int noise_type) {
     for (int i = 0; i < octaves; i++) {
         float noise_val;
         
-        // Select noise type
         if (noise_type == 0) {
-            // Perlin noise (already in range ~[-1, 1])
             noise_val = perlin_noise(p * frequency);
         } else if (noise_type == 1) {
-            // Simplex noise (returns range ~[-1, 1])
             noise_val = simplex_noise(p * frequency);
         } else {
-            // Cellular noise (now returns range ~[-1, 1])
             noise_val = cellular_noise(p * frequency);
         }
         
@@ -285,22 +248,13 @@ float fbm(vec3 p, int octaves, int noise_type) {
         amplitude *= global_params.noise_gain;
     }
     
-    // Normalize to approximately [-1, 1] range
     return value / max_value;
 }
-
-// ============================================================================
-// MAIN NOISE FUNCTION
-// ============================================================================
 
 float get_noise_value(vec3 world_pos) {
     vec3 scaled_pos = world_pos * global_params.noise_frequency;
     return fbm(scaled_pos, int(global_params.fractal_octaves), global_params.noise_type);
 }
-
-// ============================================================================
-// VOXEL GRID ACCESS
-// ============================================================================
 
 float get_voxel_value(ivec3 local_pos) {
     vec3 world_offset = chunk_data.chunk_coords * chunk_data.chunk_size;
@@ -308,16 +262,8 @@ float get_voxel_value(ivec3 local_pos) {
     
     float noise_val = get_noise_value(world_pos);
     
-    // Optional: Add height-based terrain
-    // float height_factor = (world_pos.y / chunk_data.chunk_size) - 0.5;
-    // noise_val += height_factor;
-    
     return noise_val;
 }
-
-// ============================================================================
-// MARCHING CUBES HELPERS
-// ============================================================================
 
 vec3 interpolate_vertex(vec3 p1, vec3 p2, float v1, float v2) {
     if (abs(global_params.iso_level - v1) < 0.00001)
@@ -332,8 +278,7 @@ vec3 interpolate_vertex(vec3 p1, vec3 p2, float v1, float v2) {
 }
 
 vec3 calculate_normal(vec3 p, float delta_multiplier) {
-    // Use larger delta and simplified gradient calculation for better performance
-    float delta = 1.0 * delta_multiplier;  // Slightly larger delta = smoother results
+    float delta = 1.0 * delta_multiplier;
     vec3 world_offset = chunk_data.chunk_coords * chunk_data.chunk_size;
     vec3 world_pos = world_offset + p;
     
@@ -347,10 +292,6 @@ vec3 calculate_normal(vec3 p, float delta_multiplier) {
     vec3 normal = vec3(dx, dy, dz);
     return length(normal) > 0.0 ? normalize(normal) : vec3(0, 1, 0);
 }
-
-// ============================================================================
-// MARCHING CUBES MAIN ALGORITHM
-// ============================================================================
 
 void main() {
     ivec3 grid_pos = ivec3(gl_GlobalInvocationID.xyz);
@@ -413,7 +354,6 @@ void main() {
     
     int lut_offset = cube_index * 16;
     
-    // Cache normals if smooth shading to avoid recalculation
     vec3 cached_normals[12];
     bool normal_computed[12] = bool[12](false, false, false, false, false, false, false, false, false, false, false, false);
     
@@ -430,10 +370,8 @@ void main() {
         
         vec3 normal;
         if (global_params.flat_shaded > 0.5) {
-            // Flat shading: compute face normal once
             normal = normalize(cross(v1 - v0, v2 - v0));
         } else {
-            // Smooth shading: cache per-vertex normals to avoid recalculation
             if (!normal_computed[edge0]) {
                 cached_normals[edge0] = calculate_normal(v0, 0.5);
                 normal_computed[edge0] = true;
