@@ -15,12 +15,14 @@ var player: CharacterBody3D
 
 func _ready():
 	player = $"../Player"
-	
+	noise.seed = 1337
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	noise.frequency = 0.02
-	noise.cellular_jitter = 0
+	noise.fractal_octaves = 4
 	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
-	noise.fractal_octaves = 5
+	noise.fractal_gain = 0.3
+	noise.fractal_lacunarity = 2.0
+	noise.cellular_jitter = 0
 
 func _process(_delta):
 	#calculate player chunk position

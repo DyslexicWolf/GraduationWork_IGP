@@ -17,7 +17,7 @@ anchor_bottom = 0.5
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_qmqe7")
-presets = Array[ExtResource("2_bvrih")]([ExtResource("3_x4hue"), ExtResource("4_208il"), ExtResource("5_ctljd"), ExtResource("6_1d2ir")])
+presets = Array[ExtResource("2_bvrih")]([ExtResource("5_ctljd"), ExtResource("3_x4hue"), ExtResource("4_208il"), ExtResource("6_1d2ir")])
 
 [node name="Undecided_VBoxContainer" type="VBoxContainer" parent="."]
 visible = false
